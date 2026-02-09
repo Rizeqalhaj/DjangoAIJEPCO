@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Database
+*.sqlite3
+
+# Docker volumes
+postgres_data/
+
+# ChromaDB
+chroma_data/
+
+# Claude Code local settings
+.claude/
+
+# Misc
+nul
+
+# OS
+.DS_Store
+Thumbs.db
