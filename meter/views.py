@@ -53,7 +53,7 @@ class MeterSpikesView(APIView):
         )
         analyzer = MeterAnalyzer(subscriber)
         days = int(request.query_params.get('days', 7))
-        threshold = float(request.query_params.get('threshold', 2.0))
+        threshold = float(request.query_params.get('threshold', 1.5))
         spikes = analyzer.detect_spikes(days=days, threshold_factor=threshold)
         return Response({"spikes": spikes, "count": len(spikes)})
 

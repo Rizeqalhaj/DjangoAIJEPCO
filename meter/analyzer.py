@@ -105,21 +105,33 @@ class MeterAnalyzer:
             "lowest_avg_kw": hourly_avg_kw[lowest_hour],
         }
 
-    def detect_spikes(self, days: int = 7, threshold_factor: float = 2.0) -> list:
+    def detect_spikes(self, days: int = 7, threshold_factor: float = 1.5) -> list:
         """Find unusual consumption spikes in last N days."""
         now = timezone.now()
         recent_start = now - timedelta(days=days)
-        baseline_start = now - timedelta(days=30)
+        baseline_start = now - timedelta(days=30 + days)
 
-        # 30-day baseline: average power_kw by hour of day
+        # Baseline: average power_kw by hour, EXCLUDING the recent period
         baseline_qs = self.readings.filter(
-            timestamp__gte=baseline_start
+            timestamp__gte=baseline_start,
+            timestamp__lt=recent_start,
         ).annotate(
             hour=ExtractHour('timestamp', tzinfo=JORDAN_TZ)
         ).values('hour').annotate(
             avg_kw=Avg('power_kw')
         )
         baseline = {row['hour']: row['avg_kw'] for row in baseline_qs}
+
+        # Fallback: if not enough historical data, use all available data
+        if not baseline:
+            baseline_qs = self.readings.filter(
+                timestamp__gte=now - timedelta(days=30)
+            ).annotate(
+                hour=ExtractHour('timestamp', tzinfo=JORDAN_TZ)
+            ).values('hour').annotate(
+                avg_kw=Avg('power_kw')
+            )
+            baseline = {row['hour']: row['avg_kw'] for row in baseline_qs}
 
         if not baseline:
             return []
