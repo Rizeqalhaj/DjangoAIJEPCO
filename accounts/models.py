@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from core.models import TimestampedModel
 
@@ -5,6 +6,13 @@ from core.models import TimestampedModel
 class Subscriber(TimestampedModel):
     """A JEPCO electricity subscriber."""
 
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subscriber_profile',
+    )
     subscription_number = models.CharField(
         max_length=20,
         unique=True,

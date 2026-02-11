@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 import environ
 
@@ -23,6 +24,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party
     'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
     # Project apps
     'core',
     'accounts',
@@ -37,6 +40,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -98,6 +102,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# JWT
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 # Redis
@@ -110,6 +132,23 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Amman'
+
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    'weekly-reports': {
+        'task': 'notifications.tasks.send_weekly_reports',
+        'schedule': crontab(hour=10, minute=0, day_of_week=0),
+    },
+    'spike-alerts': {
+        'task': 'notifications.tasks.check_spike_alerts',
+        'schedule': crontab(hour='*/4', minute=30),
+    },
+    'plan-verifications': {
+        'task': 'notifications.tasks.check_plan_verifications',
+        'schedule': crontab(hour=9, minute=0),
+    },
+}
 
 # Cache (uses Redis if available, otherwise in-memory)
 try:
@@ -135,11 +174,10 @@ ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 # Groq (free LLM API for development)
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 
-# WhatsApp
-WHATSAPP_ACCESS_TOKEN = env('WHATSAPP_ACCESS_TOKEN', default='')
-WHATSAPP_PHONE_NUMBER_ID = env('WHATSAPP_PHONE_NUMBER_ID', default='')
-WHATSAPP_VERIFY_TOKEN = env('WHATSAPP_VERIFY_TOKEN', default='kahrabaai-verify-token')
-WHATSAPP_APP_SECRET = env('WHATSAPP_APP_SECRET', default='')
+# Twilio WhatsApp
+TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
+TWILIO_WHATSAPP_NUMBER = env('TWILIO_WHATSAPP_NUMBER', default='whatsapp:+14155238886')
 
 # ChromaDB
 CHROMA_PERSIST_DIR = env('CHROMA_PERSIST_DIR', default='./chroma_data')
@@ -155,6 +193,18 @@ LOGGING = {
     },
     'loggers': {
         'agent': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'whatsapp': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'notifications': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'rag': {
             'handlers': ['console'],
             'level': 'INFO',
         },

@@ -38,10 +38,14 @@ def classify_intent(message: str) -> dict:
     Returns:
         {"intent": str, "confidence": float, "language": "ar"|"en"}
     """
-    raw = classify_fast(
-        prompt=f"User message: {message}",
-        system=INTENT_SYSTEM,
-    )
+    try:
+        raw = classify_fast(
+            prompt=f"User message: {message}",
+            system=INTENT_SYSTEM,
+        )
+    except Exception:
+        return {"intent": "general", "confidence": 0.5, "language": "ar"}
+
     try:
         result = json.loads(raw.strip())
         if result.get("intent") not in INTENTS:

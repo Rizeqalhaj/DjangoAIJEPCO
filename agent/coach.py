@@ -2,13 +2,21 @@
 
 import json
 import logging
-from core.llm_client import chat_with_tools, MAIN_MODEL
+
+from core.llm_client import chat_with_tools, LLMError, MAIN_MODEL
 from agent.prompts import SYSTEM_PROMPT
 from agent.tools import TOOLS, execute_tool
 from agent.intent import classify_intent
 from agent.conversation import ConversationManager
 
 logger = logging.getLogger(__name__)
+
+MAX_USER_MESSAGE_LENGTH = 4000
+
+FALLBACK_MESSAGES = {
+    "ar": "عذراً، في مشكلة تقنية. حاول مرة ثانية بعد شوي. 🔧",
+    "en": "Sorry, there's a technical issue. Please try again shortly. 🔧",
+}
 
 
 class EnergyDetective:
@@ -27,37 +35,77 @@ class EnergyDetective:
 
         Steps:
         1. Load conversation history from cache
-        2. Classify intent (fast model)
+        2. Classify intent (fast model) — non-fatal on failure
         3. Append user message to history
         4. Send to LLM with tools
         5. Execute any tool calls in a loop
         6. Return final text response
         7. Save conversation history
         """
+        # Truncate very long messages
+        if len(message) > MAX_USER_MESSAGE_LENGTH:
+            message = message[:MAX_USER_MESSAGE_LENGTH]
+
         # 1. Load conversation state
         state = self.conv_manager.get_state(phone)
         history = state.get("messages", [])
+        language = state.get("language", "ar")
 
-        # 2. Classify intent
-        logger.info("[Agent] Classifying intent for: %s", message[:50])
-        intent_result = classify_intent(message)
-        language = intent_result.get("language", "ar")
-        logger.info("[Agent] Intent: %s, Language: %s", intent_result.get("intent"), language)
+        # 2. Classify intent (non-fatal)
+        try:
+            intent_result = classify_intent(message)
+            language = intent_result.get("language", language)
+            logger.info(
+                "[Agent] Intent: %s, Language: %s",
+                intent_result.get("intent"), language,
+            )
+        except Exception:
+            logger.warning("[Agent] Intent classification failed, using defaults")
+            intent_result = {
+                "intent": "general",
+                "confidence": 0.5,
+                "language": language,
+            }
 
         # 3. Append user message to history
         history.append({"role": "user", "content": message})
 
-        # 4. Call LLM with tools
-        logger.info("[Agent] Calling LLM with %d messages", len(history))
+        # 4-5. Call LLM with tool loop
+        try:
+            final_text = self._run_tool_loop(history, phone)
+        except LLMError:
+            logger.exception("[Agent] LLM failure for phone=%s", phone)
+            final_text = FALLBACK_MESSAGES.get(language, FALLBACK_MESSAGES["ar"])
+        except Exception:
+            logger.exception("[Agent] Unexpected error for phone=%s", phone)
+            final_text = FALLBACK_MESSAGES.get(language, FALLBACK_MESSAGES["ar"])
+
+        # 6-7. Save conversation state (keep last 20 messages)
+        history.append({"role": "assistant", "content": final_text})
+        state["messages"] = history[-20:]
+        state["language"] = language
+        state["last_intent"] = intent_result.get("intent")
+        self.conv_manager.save_state(phone, state)
+
+        return final_text
+
+    def _run_tool_loop(self, history: list, phone: str = "") -> str:
+        """Execute the LLM call and tool-use loop. May raise LLMError."""
+        system = SYSTEM_PROMPT
+        if phone:
+            system += (
+                f"\n\n## Current Subscriber\n"
+                f"Phone: {phone}\n"
+                f"IMPORTANT: When calling any tool, use phone=\"{phone}\" as the phone parameter."
+            )
         response = chat_with_tools(
             messages=history,
-            system=SYSTEM_PROMPT,
+            system=system,
             tools=TOOLS,
             model=MAIN_MODEL,
             max_tokens=1024,
         )
 
-        # 5. Tool use loop (OpenAI-compatible format)
         iterations = 0
         msg = response.choices[0].message
 
@@ -89,8 +137,29 @@ class EnergyDetective:
 
             # Execute each tool and append results
             for tc in msg.tool_calls:
-                args = json.loads(tc.function.arguments)
-                result = execute_tool(tc.function.name, args)
+                try:
+                    args = json.loads(tc.function.arguments)
+                except (json.JSONDecodeError, TypeError) as exc:
+                    logger.warning(
+                        "[Agent] Malformed tool args for %s: %s",
+                        tc.function.name, exc,
+                    )
+                    history.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": json.dumps({"error": f"Invalid arguments: {exc}"}),
+                    })
+                    continue
+
+                try:
+                    result = execute_tool(tc.function.name, args)
+                except Exception as exc:
+                    logger.warning(
+                        "[Agent] Tool %s execution error: %s",
+                        tc.function.name, exc,
+                    )
+                    result = json.dumps({"error": f"Tool execution failed: {exc}"})
+
                 history.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
@@ -100,22 +169,12 @@ class EnergyDetective:
             # Call LLM again with tool results
             response = chat_with_tools(
                 messages=history,
-                system=SYSTEM_PROMPT,
+                system=system,
                 tools=TOOLS,
                 model=MAIN_MODEL,
                 max_tokens=1024,
             )
             msg = response.choices[0].message
 
-        # 6. Extract final text
         logger.info("[Agent] Done after %d tool iterations", iterations)
-        final_text = msg.content or ""
-        history.append({"role": "assistant", "content": final_text})
-
-        # 7. Save conversation state (keep last 20 messages)
-        state["messages"] = history[-20:]
-        state["language"] = language
-        state["last_intent"] = intent_result.get("intent")
-        self.conv_manager.save_state(phone, state)
-
-        return final_text
+        return msg.content or ""

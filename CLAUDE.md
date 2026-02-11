@@ -17,11 +17,11 @@ The full PRD is in `KahrabaAI_Smart_Energy_Detective_PRD.md` at the project root
 | Phase 1: Foundation | COMPLETE | Django project, models, admin, health check, 33 tests |
 | Phase 2: Smart Meter Data Layer | COMPLETE | Tariff engine, meter analyzer, data generator, seed command, REST APIs, 84 tests |
 | Phase 3: AI Agent Core | COMPLETE | LLM client, intent classifier, 13 agent tools, tool-use loop, conversation state, RAG stub, 41 tests |
-| Phase 4: WhatsApp Integration | NOT STARTED | Meta WhatsApp Business Cloud API integration |
+| Phase 4: WhatsApp Integration | COMPLETE | Twilio WhatsApp API, webhook, sender, Celery fallback, onboarding, message splitting, 56 tests |
 | Phase 5: Investigation & Plan Engine | NOT STARTED | ChromaDB RAG, enhanced investigation flows |
 | Phase 6: Polish & Demo | NOT STARTED | Final polish, demo mode |
 
-**Total tests: 158 (all passing)**
+**Total tests: 214 (all passing)**
 
 ---
 
@@ -95,12 +95,18 @@ KahrabaAIDjango/
 │   └── llm_client.py    # Groq SDK wrapper (chat_with_tools, classify_fast)
 ├── seed/                # Demo data
 │   └── management/commands/seed_demo.py  # Creates 5 subscribers + 30 days of readings
-├── whatsapp/            # Phase 4 (skeleton)
+├── whatsapp/            # WhatsApp Integration (Phase 4 — Twilio)
+│   ├── webhook.py       # Twilio POST webhook, X-Twilio-Signature verification
+│   ├── sender.py        # Twilio SDK client (send_text, send_buttons, send_list)
+│   ├── tasks.py         # Message processing, Celery/sync fallback, registration, splitting
+│   ├── message_templates.py  # Arabic/English message templates
+│   └── urls.py          # /api/whatsapp/webhook/
 ├── notifications/       # Phase 6 (skeleton)
 ├── tests/               # All tests
 │   ├── test_phase1.py   # 33 tests (models, admin, health check)
 │   ├── test_phase2.py   # 84 tests (tariff, meter, seed, APIs)
 │   ├── test_phase3.py   # 41 tests (LLM client, intent, tools, agent, RAG)
+│   ├── test_phase4.py   # 56 tests (Twilio webhook, sender, tasks, registration, edge cases)
 │   ├── test_tariff_engine.py
 │   └── test_meter_analyzer.py
 ├── .env.example         # Template — copy to .env and fill in keys
@@ -140,7 +146,7 @@ python manage.py migrate
 # 7. Seed demo data (5 subscribers, 30 days of meter readings)
 python manage.py seed_demo
 
-# 8. Run tests (all 158 should pass)
+# 8. Run tests (all 214 should pass)
 python manage.py test
 
 # 9. Start dev server
@@ -168,6 +174,7 @@ python manage.py runserver
 | GET | `/api/tariff/current/` | Current TOU period |
 | POST | `/api/tariff/calculate/` | Calculate bill `{"kwh": 500}` |
 | POST | `/api/agent/chat/` | Agent chat `{"phone": "+962791000001", "message": "..."}` |
+| POST | `/api/whatsapp/webhook/` | Twilio WhatsApp webhook (X-Twilio-Signature verified) |
 
 ---
 
@@ -193,6 +200,7 @@ python manage.py test
 python manage.py test tests.test_phase1
 python manage.py test tests.test_phase2
 python manage.py test tests.test_phase3
+python manage.py test tests.test_phase4
 
 # Specific test class
 python manage.py test tests.test_phase3.ToolExecutionTest
@@ -212,8 +220,8 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 
 ## Next Phase to Implement
 
-**Phase 4: WhatsApp Integration** — see `KahrabaAI_Smart_Energy_Detective_PRD.md` for full specs. Key tasks:
-- Meta WhatsApp Business Cloud API webhook
-- Message receive/send handlers
-- Message templates for Arabic
-- Celery async processing (requires Redis)
+**Phase 5: Investigation & Plan Engine** — see `KahrabaAI_Smart_Energy_Detective_PRD.md` for full specs. Key tasks:
+- ChromaDB vector search replacing RAG stub
+- Document ingestion pipeline (energy tips, tariff docs)
+- Scheduled notifications (weekly reports, spike alerts, plan verifications via Celery beat)
+- Enhanced investigation conversation flows

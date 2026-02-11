@@ -8,4 +8,6 @@ urlpatterns = [
     path('<str:subscription_number>/daily/<str:target_date>/', views.MeterDailyView.as_view(), name='daily'),
     path('<str:subscription_number>/spikes/', views.MeterSpikesView.as_view(), name='spikes'),
     path('<str:subscription_number>/forecast/', views.BillForecastView.as_view(), name='forecast'),
+    path('<str:subscription_number>/daily-series/', views.MeterDailySeriesView.as_view(), name='daily-series'),
+    path('<str:subscription_number>/hourly-profile/', views.MeterHourlyProfileView.as_view(), name='hourly-profile'),
 ]

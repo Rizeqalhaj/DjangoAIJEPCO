@@ -7,7 +7,9 @@ Usage:
     python manage.py seed_demo --clear
 """
 
+from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
+
 from accounts.models import Subscriber
 from meter.models import MeterReading
 from meter.generator import generate_meter_data
@@ -18,6 +20,7 @@ DEMO_SUBSCRIBERS = [
         "subscription_number": "01-100001-01",
         "phone_number": "+962791000001",
         "name": "\u0623\u062d\u0645\u062f \u0627\u0644\u062e\u0627\u0644\u062f\u064a",
+        "username": "ahmed",
         "area": "\u0639\u0628\u062f\u0648\u0646",
         "household_size": 4,
         "has_ev": True,
@@ -28,6 +31,7 @@ DEMO_SUBSCRIBERS = [
         "subscription_number": "01-100002-01",
         "phone_number": "+962791000002",
         "name": "\u0633\u0627\u0631\u0629 \u0627\u0644\u0645\u0635\u0631\u064a",
+        "username": "sara",
         "area": "\u0627\u0644\u0635\u0648\u064a\u0641\u064a\u0629",
         "household_size": 5,
         "has_ev": False,
@@ -38,6 +42,7 @@ DEMO_SUBSCRIBERS = [
         "subscription_number": "01-100003-01",
         "phone_number": "+962791000003",
         "name": "\u0645\u062d\u0645\u062f \u0627\u0644\u0639\u0628\u0627\u062f\u064a",
+        "username": "mohammed",
         "area": "\u062e\u0644\u062f\u0627",
         "household_size": 3,
         "has_ev": False,
@@ -48,6 +53,7 @@ DEMO_SUBSCRIBERS = [
         "subscription_number": "01-100004-01",
         "phone_number": "+962791000004",
         "name": "\u0644\u064a\u0646\u0627 \u062d\u062f\u0627\u062f",
+        "username": "lina",
         "area": "\u0627\u0644\u062c\u0628\u064a\u0647\u0629",
         "household_size": 6,
         "has_ev": False,
@@ -58,6 +64,7 @@ DEMO_SUBSCRIBERS = [
         "subscription_number": "01-100005-01",
         "phone_number": "+962791000005",
         "name": "\u0639\u0645\u0631 \u0627\u0644\u0632\u0639\u0628\u064a",
+        "username": "omar",
         "area": "\u062f\u0627\u0628\u0648\u0642",
         "household_size": 3,
         "has_ev": True,
@@ -92,6 +99,11 @@ class Command(BaseCommand):
                 f"Cleared existing demo data ({deleted[0]} objects deleted)."
             ))
 
+        # Create admin superuser
+        if not User.objects.filter(username="admin").exists():
+            User.objects.create_superuser("admin", "admin@kahrabaai.local", "admin123")
+            self.stdout.write("  Created admin superuser (admin / admin123)")
+
         for sub_data in DEMO_SUBSCRIBERS:
             profile = sub_data['profile']
             subscriber, created = Subscriber.objects.get_or_create(
@@ -108,6 +120,21 @@ class Command(BaseCommand):
                     'is_verified': True,
                 }
             )
+
+            # Link or create User account
+            username = sub_data.get("username", "")
+            if username and not subscriber.user:
+                user, u_created = User.objects.get_or_create(
+                    username=username,
+                    defaults={"first_name": sub_data["name"]},
+                )
+                if u_created:
+                    user.set_password("demo123")
+                    user.save()
+                subscriber.user = user
+                subscriber.save(update_fields=["user"])
+                if u_created:
+                    self.stdout.write(f"  Created user: {username} / demo123")
 
             if not created:
                 self.stdout.write(

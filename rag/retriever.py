@@ -1,8 +1,60 @@
 """
-RAG retriever stub.
+RAG retriever with ChromaDB vector search and keyword fallback.
 
-Returns hardcoded energy tips and tariff info until Phase 5 adds ChromaDB.
+Uses ChromaDB + sentence-transformers if available, otherwise falls back
+to keyword search against a hardcoded knowledge base.
 """
+
+import logging
+
+logger = logging.getLogger("rag")
+
+# ─── ChromaDB State (lazy-initialized) ───────────────────────────────
+
+_CHROMA_AVAILABLE = False
+_chroma_init_attempted = False
+_collection = None
+_model = None
+
+
+def _try_init_chroma():
+    """
+    One-time attempt to initialize ChromaDB client and embedding model.
+
+    Sets _CHROMA_AVAILABLE = True on success. Silently falls back on failure.
+    """
+    global _CHROMA_AVAILABLE, _chroma_init_attempted, _collection, _model
+    if _chroma_init_attempted:
+        return
+    _chroma_init_attempted = True
+
+    try:
+        import chromadb
+        from sentence_transformers import SentenceTransformer
+        from django.conf import settings
+
+        persist_dir = getattr(settings, "CHROMA_PERSIST_DIR", "./chroma_data")
+        client = chromadb.PersistentClient(path=str(persist_dir))
+        _collection = client.get_or_create_collection("kahrabaai_knowledge")
+
+        if _collection.count() == 0:
+            logger.info("ChromaDB collection empty, using keyword fallback")
+            return
+
+        _model = SentenceTransformer("intfloat/multilingual-e5-large")
+        _CHROMA_AVAILABLE = True
+        logger.info(
+            "ChromaDB RAG initialized with %d documents", _collection.count()
+        )
+    except ImportError:
+        logger.info(
+            "chromadb/sentence-transformers not installed, using keyword fallback"
+        )
+    except Exception as exc:
+        logger.warning("ChromaDB init failed: %s, using keyword fallback", exc)
+
+
+# ─── Keyword Fallback Knowledge Base ─────────────────────────────────
 
 _KNOWLEDGE_BASE = [
     {
@@ -154,9 +206,46 @@ def search(query: str, n_results: int = 3) -> list[dict]:
     """
     Search the knowledge base for relevant information.
 
-    Stub implementation: keyword matching against hardcoded knowledge base.
-    Phase 5 will replace this with ChromaDB vector search.
+    Uses ChromaDB vector search if available, otherwise falls back
+    to keyword matching against the hardcoded knowledge base.
+
+    Returns:
+        List of dicts with keys: title, content, source.
     """
+    _try_init_chroma()
+    if _CHROMA_AVAILABLE:
+        return _search_vector(query, n_results)
+    return _search_keywords(query, n_results)
+
+
+# ─── Vector Search (ChromaDB) ────────────────────────────────────────
+
+
+def _search_vector(query: str, n_results: int) -> list[dict]:
+    """Search via ChromaDB vector similarity."""
+    embedding = _model.encode(f"query: {query}").tolist()
+    results = _collection.query(
+        query_embeddings=[embedding],
+        n_results=n_results,
+    )
+
+    output = []
+    if results and results.get("documents") and results["documents"][0]:
+        for i in range(len(results["documents"][0])):
+            meta = results["metadatas"][0][i] if results.get("metadatas") else {}
+            output.append({
+                "title": meta.get("source", ""),
+                "content": results["documents"][0][i],
+                "source": meta.get("source", ""),
+            })
+    return output
+
+
+# ─── Keyword Search (Fallback) ───────────────────────────────────────
+
+
+def _search_keywords(query: str, n_results: int) -> list[dict]:
+    """Keyword-based search against the hardcoded knowledge base."""
     query_lower = query.lower()
     query_words = set(query_lower.split())
 
@@ -182,7 +271,6 @@ def search(query: str, n_results: int = 3) -> list[dict]:
         })
 
     if not results:
-        # Return the most general tips if no keyword match
         for entry in _KNOWLEDGE_BASE[:n_results]:
             results.append({
                 "title": entry["title"],
