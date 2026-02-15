@@ -23,6 +23,10 @@ export const en = {
     recentSpikes: "Recent Spikes",
     viewAll: "View All",
     touBreakdown: "TOU Breakdown",
+    customRange: "Custom",
+    from: "From",
+    to: "To",
+    apply: "Apply",
   },
   common: {
     kwh: "kWh",
@@ -95,6 +99,8 @@ export const en = {
     hypothesis: "Your Hypothesis",
     created: "Created",
     verifyBy: "Verify By",
+    cancel: "Cancel Plan",
+    confirmCancel: "Are you sure you want to cancel this plan?",
   },
   admin: {
     title: "Admin Dashboard",

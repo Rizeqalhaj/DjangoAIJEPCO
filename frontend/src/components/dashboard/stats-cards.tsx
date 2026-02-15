@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ConsumptionSummary } from "@/types/api";
+import { formatDateShort } from "@/lib/format-date";
 import { useT } from "@/i18n";
 
 function StatSkeleton() {
@@ -90,11 +91,11 @@ export function StatsCards({ summary }: { summary?: ConsumptionSummary }) {
         : t.common.stable;
 
   const highLowDetail = summary.highest_day
-    ? `${t.dashboard.high}: ${summary.highest_day.kwh.toFixed(0)} ${t.common.kwh} (${summary.highest_day.date.slice(5)})`
+    ? `${t.dashboard.high}: ${summary.highest_day.kwh.toFixed(0)} ${t.common.kwh} (${formatDateShort(summary.highest_day.date)})`
     : undefined;
 
   const lowDetail = summary.lowest_day
-    ? `${t.dashboard.low}: ${summary.lowest_day.kwh.toFixed(0)} ${t.common.kwh} (${summary.lowest_day.date.slice(5)})`
+    ? `${t.dashboard.low}: ${summary.lowest_day.kwh.toFixed(0)} ${t.common.kwh} (${formatDateShort(summary.lowest_day.date)})`
     : undefined;
 
   return (

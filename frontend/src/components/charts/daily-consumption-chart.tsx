@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import type { DailySeriesItem } from "@/types/api";
 import { useT } from "@/i18n";
+import { formatDateShort } from "@/lib/format-date";
 
 interface TooltipPayloadEntry {
   color: string;
@@ -56,7 +57,7 @@ export function DailyConsumptionChart({ data }: { data: DailySeriesItem[] }) {
   const t = useT();
   const formatted = data.map((d) => ({
     ...d,
-    date: d.date.slice(5),
+    date: formatDateShort(d.date),
   }));
 
   return (

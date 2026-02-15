@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework import status
+
+from core.clock import now as clock_now
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,13 +16,27 @@ from meter.analyzer import MeterAnalyzer
 
 
 class MeterSummaryView(APIView):
-    """GET /api/meter/<subscription_number>/summary/"""
+    """GET /api/meter/<subscription_number>/summary/?days=30
+    or  GET /api/meter/<subscription_number>/summary/?start_date=2026-01-01&end_date=2026-01-31
+    """
 
     def get(self, request, subscription_number):
         subscriber = get_object_or_404(
             Subscriber, subscription_number=subscription_number
         )
         analyzer = MeterAnalyzer(subscriber)
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date and end_date:
+            try:
+                sd = datetime.strptime(start_date, '%Y-%m-%d').date()
+                ed = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(analyzer.get_consumption_summary(start_date=sd, end_date=ed))
         days = int(request.query_params.get('days', 30))
         return Response(analyzer.get_consumption_summary(days=days))
 
@@ -70,15 +85,33 @@ class BillForecastView(APIView):
 
 
 class MeterDailySeriesView(APIView):
-    """GET /api/meter/<subscription_number>/daily-series/?days=14"""
+    """GET /api/meter/<subscription_number>/daily-series/?days=14
+    or  GET /api/meter/<subscription_number>/daily-series/?start_date=2026-01-01&end_date=2026-01-31
+    """
 
     def get(self, request, subscription_number):
         subscriber = get_object_or_404(
             Subscriber, subscription_number=subscription_number
         )
-        days = int(request.query_params.get("days", 14))
-        start = timezone.now() - timedelta(days=days)
-        qs = subscriber.readings.filter(timestamp__gte=start)
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        if start_date and end_date:
+            try:
+                sd = datetime.strptime(start_date, '%Y-%m-%d').date()
+                ed = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = subscriber.readings.filter(
+                timestamp__date__gte=sd,
+                timestamp__date__lte=ed,
+            )
+        else:
+            days = int(request.query_params.get("days", 14))
+            start = clock_now() - timedelta(days=days)
+            qs = subscriber.readings.filter(timestamp__gte=start)
         daily = (
             qs.annotate(day=TruncDate("timestamp"))
             .values("day")
@@ -110,7 +143,7 @@ class MeterHourlyProfileView(APIView):
             Subscriber, subscription_number=subscription_number
         )
         days = int(request.query_params.get("days", 14))
-        now = timezone.now()
+        now = clock_now()
         start = (now - timedelta(days=days)).date()
         end = now.date()
         analyzer = MeterAnalyzer(subscriber)

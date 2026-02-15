@@ -440,13 +440,16 @@ class AgentChatEndpointTest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    def test_missing_message_returns_400(self):
+    def test_missing_message_returns_friendly_prompt(self):
         response = self.client.post(
             "/api/agent/chat/",
             data=json.dumps({"phone": "+962795000001"}),
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("reply", data)
+        self.assertEqual(data["phone"], "+962795000001")
 
     @patch("agent.coach.chat_with_tools")
     @patch("agent.coach.classify_intent")
@@ -504,7 +507,7 @@ class ToolDefinitionsTest(TestCase):
 
     def test_tools_count(self):
         from agent.tools import TOOLS
-        self.assertEqual(len(TOOLS), 13)
+        self.assertEqual(len(TOOLS), 14)
 
     def test_all_tools_have_openai_format(self):
         from agent.tools import TOOLS
@@ -521,3 +524,105 @@ class ToolDefinitionsTest(TestCase):
         from agent.tools import TOOLS
         names = [t["function"]["name"] for t in TOOLS]
         self.assertEqual(len(names), len(set(names)))
+
+
+# ---------------------------------------------------------------------------
+# Guardrails Tests
+# ---------------------------------------------------------------------------
+
+class GuardrailsTest(TestCase):
+    """Test the post-response guardrail checks."""
+
+    def test_english_response_with_arabic_detected(self):
+        from agent.guardrails import check_language_consistency
+        # Response that mixes English and Arabic
+        text = "Your consumption was 15 kWh. هل بتتوقع في سبب معين خلى استهلاكك عالي؟"
+        result = check_language_consistency(text, "en")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["issue"], "language_mixing")
+        self.assertEqual(result["severity"], "high")
+
+    def test_english_response_clean(self):
+        from agent.guardrails import check_language_consistency
+        text = "Your consumption was 15 kWh. Do you think something changed?"
+        result = check_language_consistency(text, "en")
+        self.assertIsNone(result)
+
+    def test_english_with_allowed_terms(self):
+        from agent.guardrails import check_language_consistency
+        # kWh, JOD, TOU, JEPCO are allowed in Arabic responses
+        text = "استهلاكك كان 15 kWh وفاتورتك 50 JOD حسب تعرفة JEPCO"
+        result = check_language_consistency(text, "ar")
+        self.assertIsNone(result)
+
+    def test_no_tool_calls_on_data_question_en(self):
+        from agent.guardrails import check_tool_usage
+        result = check_tool_usage("what was my consumption yesterday?", 0, "en")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["issue"], "no_tool_calls")
+
+    def test_no_tool_calls_on_data_question_ar(self):
+        from agent.guardrails import check_tool_usage
+        result = check_tool_usage("كم كان استهلاكي أمس؟", 0, "ar")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["issue"], "no_tool_calls")
+
+    def test_tool_calls_made_ok(self):
+        from agent.guardrails import check_tool_usage
+        result = check_tool_usage("what was my consumption?", 2, "en")
+        self.assertIsNone(result)
+
+    def test_no_tool_calls_on_greeting_ok(self):
+        from agent.guardrails import check_tool_usage
+        result = check_tool_usage("hello!", 0, "en")
+        self.assertIsNone(result)
+
+    def test_plan_claimed_saved_but_not_saved(self):
+        from agent.guardrails import check_plan_saved
+        text = "I've saved the plan for you. We'll monitor for 7 days and check back."
+        result = check_plan_saved(text, ["get_consumption_summary", "detect_patterns"], "en")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["issue"], "plan_not_saved")
+
+    def test_plan_proposed_without_saving_is_ok(self):
+        """Step 1 of two-step flow: proposing a plan without create_plan is valid."""
+        from agent.guardrails import check_plan_saved
+        text = "Here's the plan: shift your washing machine to off-peak. Monitoring period: 7 days. Do you want me to save this plan?"
+        result = check_plan_saved(text, ["get_consumption_summary", "detect_patterns"], "en")
+        self.assertIsNone(result)
+
+    def test_plan_described_and_saved(self):
+        from agent.guardrails import check_plan_saved
+        text = "I've created a plan for you. We'll check back in 7 days."
+        result = check_plan_saved(text, ["detect_patterns", "create_plan"], "en")
+        self.assertIsNone(result)
+
+    def test_no_plan_described(self):
+        from agent.guardrails import check_plan_saved
+        text = "Your consumption is 15 kWh per day."
+        result = check_plan_saved(text, ["get_consumption_summary"], "en")
+        self.assertIsNone(result)
+
+    def test_validate_response_multiple_violations(self):
+        from agent.guardrails import validate_response
+        violations = validate_response(
+            response_text="Your bill is 50 JOD. هل في سبب معين؟ I've saved the plan for you.",
+            user_message="why is my bill so high?",
+            language="en",
+            tool_calls_made=0,
+            tool_names_called=[],
+        )
+        issues = [v["issue"] for v in violations]
+        self.assertIn("language_mixing", issues)
+        self.assertIn("no_tool_calls", issues)
+
+    def test_validate_response_all_clear(self):
+        from agent.guardrails import validate_response
+        violations = validate_response(
+            response_text="Your consumption was 15 kWh yesterday. That's normal.",
+            user_message="what was my consumption yesterday?",
+            language="en",
+            tool_calls_made=1,
+            tool_names_called=["get_daily_detail"],
+        )
+        self.assertEqual(len(violations), 0)

@@ -8,19 +8,31 @@ import type {
   HourlyProfile,
 } from "@/types/api";
 
-export function useConsumptionSummary(sub: string, days = 30) {
+export interface DateRange {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+}
+
+function buildParams(days: number, range?: DateRange): string {
+  if (range) {
+    return `start_date=${range.startDate}&end_date=${range.endDate}`;
+  }
+  return `days=${days}`;
+}
+
+export function useConsumptionSummary(sub: string, days = 30, range?: DateRange) {
   return useQuery<ConsumptionSummary>({
-    queryKey: ["meter", "summary", sub, days],
-    queryFn: () => api.get(`/meter/${sub}/summary/?days=${days}`).then((r) => r.data),
+    queryKey: ["meter", "summary", sub, range ? `${range.startDate}_${range.endDate}` : days],
+    queryFn: () => api.get(`/meter/${sub}/summary/?${buildParams(days, range)}`).then((r) => r.data),
     enabled: !!sub,
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useDailySeries(sub: string, days = 14) {
+export function useDailySeries(sub: string, days = 14, range?: DateRange) {
   return useQuery<DailySeriesItem[]>({
-    queryKey: ["meter", "daily-series", sub, days],
-    queryFn: () => api.get(`/meter/${sub}/daily-series/?days=${days}`).then((r) => r.data),
+    queryKey: ["meter", "daily-series", sub, range ? `${range.startDate}_${range.endDate}` : days],
+    queryFn: () => api.get(`/meter/${sub}/daily-series/?${buildParams(days, range)}`).then((r) => r.data),
     enabled: !!sub,
     staleTime: 5 * 60 * 1000,
   });

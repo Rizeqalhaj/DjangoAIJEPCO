@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
@@ -17,4 +18,10 @@ urlpatterns = [
     path('api/agent/', include('agent.urls')),
     path('api/plans/', include('plans.urls')),
     path('api/whatsapp/', include('whatsapp.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path('api/debug/', include('core.debug_urls')),
+    ]

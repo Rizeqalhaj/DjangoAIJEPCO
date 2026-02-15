@@ -6,7 +6,6 @@ WEEKLY_REPORT_AR = (
     "📊 *التقرير الأسبوعي للاستهلاك*\n\n"
     "المعدل اليومي: {avg_daily_kwh} كيلوواط\n"
     "إجمالي الأسبوع: {total_kwh} كيلوواط\n"
-    "التكلفة اليومية: {avg_daily_cost_fils} فلس\n"
     "{change_line}"
 )
 
@@ -14,7 +13,6 @@ WEEKLY_REPORT_EN = (
     "📊 *Weekly Consumption Report*\n\n"
     "Daily average: {avg_daily_kwh} kWh\n"
     "Weekly total: {total_kwh} kWh\n"
-    "Daily cost: {avg_daily_cost_fils} fils\n"
     "{change_line}"
 )
 
@@ -47,13 +45,29 @@ SPIKE_ALERT_EN = (
     "💡 Check which appliances were running at that time."
 )
 
+# ─── Plan Created Confirmation ───────────────────────────────────────
+
+PLAN_CREATED_AR = (
+    "✅ *تم حفظ خطة التوفير*\n\n"
+    "الخطة: {plan_summary}\n"
+    "سنتابع استهلاكك ونرسل لك النتائج بتاريخ {verify_date}.\n\n"
+    "💡 طبّق الخطة وراقب استهلاكك اليومي."
+)
+
+PLAN_CREATED_EN = (
+    "✅ *Optimization Plan Saved*\n\n"
+    "Plan: {plan_summary}\n"
+    "We'll monitor your usage and send results on {verify_date}.\n\n"
+    "💡 Follow the plan and watch your daily consumption."
+)
+
 # ─── Plan Verification Results ────────────────────────────────────────
 
 PLAN_RESULT_IMPROVED_AR = (
     "🎉 *نتائج خطة التوفير*\n\n"
     "الخطة: {plan_summary}\n"
     "النتيجة: تحسن بنسبة {change_percent}%\n"
-    "التوفير الشهري المتوقع: {savings_jod} دينار\n\n"
+    "التوفير اليومي المتوقع: {savings_kwh} كيلوواط\n\n"
     "أحسنت! استمر على هذا النهج."
 )
 
@@ -61,7 +75,7 @@ PLAN_RESULT_IMPROVED_EN = (
     "🎉 *Plan Verification Results*\n\n"
     "Plan: {plan_summary}\n"
     "Result: Improved by {change_percent}%\n"
-    "Estimated monthly savings: {savings_jod} JOD\n\n"
+    "Estimated daily savings: {savings_kwh} kWh\n\n"
     "Great job! Keep it up."
 )
 
@@ -79,4 +93,18 @@ PLAN_RESULT_NOT_IMPROVED_EN = (
     "Result: Changed by {change_percent}%\n"
     "Target savings not yet achieved.\n\n"
     "💡 Need help adjusting the plan? Send \"adjust plan\"."
+)
+
+# ─── Plan Abandoned ─────────────────────────────────────────────────
+
+PLAN_ABANDONED_AR = (
+    "🗑️ *تم إلغاء الخطة*\n\n"
+    "الخطة: {plan_summary}\n\n"
+    "يمكنك إنشاء خطة جديدة في أي وقت."
+)
+
+PLAN_ABANDONED_EN = (
+    "🗑️ *Plan Cancelled*\n\n"
+    "Plan: {plan_summary}\n\n"
+    "You can create a new plan anytime."
 )

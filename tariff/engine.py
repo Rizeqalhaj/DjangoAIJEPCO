@@ -112,6 +112,11 @@ def get_tou_period(dt: Optional[datetime] = None) -> dict:
         "next_period": next_period,
         "next_period_name_ar": _PERIOD_NAMES[next_period]["ar"],
         "next_period_name_en": _PERIOD_NAMES[next_period]["en"],
+        "full_schedule": [
+            {"period": "off_peak", "name_en": "Off-Peak", "name_ar": "خارج الذروة", "hours": "05:00 – 14:00"},
+            {"period": "partial_peak", "name_en": "Partial Peak", "name_ar": "ذروة جزئية", "hours": "14:00 – 17:00 & 23:00 – 05:00"},
+            {"period": "peak", "name_en": "Peak", "name_ar": "وقت الذروة", "hours": "17:00 – 23:00"},
+        ],
     }
 
 

@@ -23,11 +23,17 @@ class AgentChatView(APIView):
         phone = request.data.get("phone")
         message = request.data.get("message")
 
-        if not phone or not message:
+        if not phone:
             return Response(
-                {"error": "phone and message required"},
+                {"error": "phone is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if not message or not message.strip():
+            return Response({
+                "reply": "مرحبا! كيف بقدر أساعدك؟ اسألني عن استهلاكك أو فاتورتك. 💡",
+                "phone": phone,
+            })
 
         try:
             agent = EnergyDetective()

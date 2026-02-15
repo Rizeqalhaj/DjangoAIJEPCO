@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useSpikes } from "@/hooks/use-meter";
 import { useT } from "@/i18n";
+import { formatDateTime } from "@/lib/format-date";
 import { SpikeTimeline } from "@/components/charts/spike-timeline";
 import {
   Card,
@@ -90,7 +91,7 @@ export default function SpikesPage() {
                         className={`border ${severityClass(s.spike_factor)}`}
                       >
                         <td className="p-2">
-                          {new Date(s.timestamp).toLocaleString()}
+                          {formatDateTime(s.timestamp)}
                         </td>
                         <td className="p-2 font-medium text-[#ef4444]">
                           {s.power_kw} {t.common.kw}

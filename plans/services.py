@@ -1,11 +1,21 @@
 """Plan services for creating, retrieving, and checking optimization plans."""
 
+import logging
 from datetime import timedelta
-from django.utils import timezone
 
+from core.clock import now as clock_now
 from plans.models import OptimizationPlan, PlanCheckpoint
 from meter.analyzer import MeterAnalyzer
 from tariff.engine import calculate_residential_bill
+from whatsapp.sender import send_text
+from notifications.message_templates import (
+    PLAN_CREATED_AR,
+    PLAN_CREATED_EN,
+    PLAN_ABANDONED_AR,
+    PLAN_ABANDONED_EN,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def create_optimization_plan(subscriber, tool_input: dict) -> OptimizationPlan:
@@ -45,9 +55,81 @@ def create_optimization_plan(subscriber, tool_input: dict) -> OptimizationPlan:
         baseline_peak_kwh=baseline_peak,
         baseline_monthly_cost_fils=int(baseline_monthly_cost),
         status='active',
-        verify_after_date=timezone.now().date() + timedelta(days=monitoring_days),
+        verify_after_date=clock_now().date() + timedelta(days=monitoring_days),
     )
+
+    _send_plan_created_notification(subscriber, plan)
+
     return plan
+
+
+def _send_plan_created_notification(subscriber, plan):
+    """Send WhatsApp confirmation that a plan was created."""
+    try:
+        is_ar = subscriber.language == "ar"
+        template = PLAN_CREATED_AR if is_ar else PLAN_CREATED_EN
+        message = template.format(
+            plan_summary=plan.plan_summary[:100],
+            verify_date=plan.verify_after_date.strftime("%Y-%m-%d"),
+        )
+        send_text(subscriber.phone_number, message)
+    except Exception:
+        logger.exception(
+            "Failed to send plan creation notification for subscriber %s",
+            subscriber.phone_number,
+        )
+
+
+def delete_plan(subscriber, plan_id: int | None = None) -> dict:
+    """
+    Delete an optimization plan from the database.
+
+    If plan_id is None, deletes the latest active/monitoring plan.
+    Sends a WhatsApp notification before deletion.
+
+    Returns a dict with status or error.
+    """
+    if plan_id:
+        try:
+            plan = OptimizationPlan.objects.get(id=plan_id, subscriber=subscriber)
+        except OptimizationPlan.DoesNotExist:
+            return {"error": "Plan not found"}
+    else:
+        plan = (
+            OptimizationPlan.objects
+            .filter(subscriber=subscriber, status__in=["active", "monitoring"])
+            .order_by("-created_at")
+            .first()
+        )
+        if not plan:
+            return {"error": "No active plan to delete"}
+
+    plan_summary = plan.plan_summary
+    deleted_id = plan.id
+
+    _send_plan_deleted_notification(subscriber, plan)
+
+    plan.delete()
+
+    return {
+        "plan_id": deleted_id,
+        "status": "deleted",
+        "message": f"Plan '{plan_summary[:50]}' has been deleted.",
+    }
+
+
+def _send_plan_deleted_notification(subscriber, plan):
+    """Send WhatsApp confirmation that a plan was deleted."""
+    try:
+        is_ar = subscriber.language == "ar"
+        template = PLAN_ABANDONED_AR if is_ar else PLAN_ABANDONED_EN
+        message = template.format(plan_summary=plan.plan_summary[:100])
+        send_text(subscriber.phone_number, message)
+    except Exception:
+        logger.exception(
+            "Failed to send plan abandonment notification for subscriber %s",
+            subscriber.phone_number,
+        )
 
 
 def get_active_plan(subscriber) -> OptimizationPlan | None:
@@ -76,7 +158,7 @@ def check_progress(subscriber, plan_id: int) -> dict:
         return {"error": "Plan not found"}
 
     analyzer = MeterAnalyzer(subscriber)
-    days_since = (timezone.now().date() - plan.created_at.date()).days
+    days_since = (clock_now().date() - plan.created_at.date()).days
     if days_since < 1:
         days_since = 1
 
@@ -105,12 +187,12 @@ def check_progress(subscriber, plan_id: int) -> dict:
     estimated_monthly_savings_jod = round(estimated_monthly_savings_fils / 1000, 2)
 
     is_improving = change_percent < 0
-    ready_for_verification = timezone.now().date() >= plan.verify_after_date
+    ready_for_verification = clock_now().date() >= plan.verify_after_date
 
     # Record checkpoint
     PlanCheckpoint.objects.create(
         plan=plan,
-        check_date=timezone.now().date(),
+        check_date=clock_now().date(),
         avg_daily_kwh=round(current_daily, 2),
         avg_peak_kwh=current_peak_kwh,
         avg_offpeak_kwh=current_offpeak_kwh,
@@ -150,7 +232,7 @@ def verify_plan(plan: OptimizationPlan) -> dict:
 
     plan.status = 'verified'
     plan.verification_result = {
-        "verified_at": timezone.now().isoformat(),
+        "verified_at": clock_now().isoformat(),
         "baseline_daily_kwh": progress["baseline_daily_kwh"],
         "final_daily_kwh": progress["current_daily_kwh"],
         "change_percent": progress["change_percent"],

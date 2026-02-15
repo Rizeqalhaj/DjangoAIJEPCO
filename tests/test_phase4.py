@@ -211,6 +211,7 @@ class WebhookMessageExtractionTest(TestCase):
     TWILIO_ACCOUNT_SID="ACtest123",
     TWILIO_AUTH_TOKEN="test-auth-token",
     TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886",
+    WHATSAPP_DRY_RUN=False,
 )
 class SenderTest(TestCase):
 

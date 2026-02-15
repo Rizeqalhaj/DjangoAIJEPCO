@@ -2,8 +2,9 @@
 
 from datetime import timedelta
 
-from django.utils import timezone
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
+
+from core.clock import now as clock_now
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -84,7 +85,7 @@ class AdminStatsView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        thirty_days_ago = timezone.now() - timedelta(days=30)
+        thirty_days_ago = clock_now() - timedelta(days=30)
         return Response({
             "total_subscribers": Subscriber.objects.count(),
             "verified_subscribers": Subscriber.objects.filter(

@@ -25,6 +25,10 @@ export const ar: Translations = {
     recentSpikes: "ارتفاعات حديثة",
     viewAll: "عرض الكل",
     touBreakdown: "توزيع فترات الاستهلاك",
+    customRange: "مخصص",
+    from: "من",
+    to: "إلى",
+    apply: "تطبيق",
   },
   common: {
     kwh: "كيلوواط/ساعة",
@@ -97,6 +101,8 @@ export const ar: Translations = {
     hypothesis: "فرضيتك",
     created: "تاريخ الإنشاء",
     verifyBy: "التحقق بحلول",
+    cancel: "إلغاء الخطة",
+    confirmCancel: "هل أنت متأكد من إلغاء هذه الخطة؟",
   },
   admin: {
     title: "لوحة الإدارة",

@@ -26,15 +26,21 @@ TOOLS = [
         "function": {
             "name": "get_consumption_summary",
             "description": (
-                "Get overall consumption summary for the subscriber over the last N days. "
+                "Get overall consumption summary for the subscriber. "
                 "Returns total kWh, average daily kWh, peak/off-peak split, "
-                "highest/lowest day, cost estimate, and trend direction."
+                "highest/lowest day, cost estimate, and trend direction. "
+                "Use start_date + end_date for a specific calendar month or date range "
+                "(e.g. January 2026 = start_date 2026-01-01, end_date 2026-01-31). "
+                "Use days for a rolling window (e.g. last 7 days, last 30 days). "
+                "If none provided, defaults to last 30 days."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "phone": {"type": "string", "description": "Phone number"},
-                    "days": {"type": "integer", "description": "Number of days to analyze (default 30)"},
+                    "days": {"type": "integer", "description": "Rolling window in days (default 30). Ignored if start_date/end_date provided."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD (use for specific month/period queries)"},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (use for specific month/period queries)"},
                 },
                 "required": ["phone"],
             },
@@ -194,10 +200,11 @@ TOOLS = [
         "function": {
             "name": "create_plan",
             "description": (
-                "Create and save a new optimization plan for the subscriber. "
-                "Call this ONLY after: (1) you've detected a pattern, "
-                "(2) the user confirmed what's causing it, and "
-                "(3) you've agreed on specific actions."
+                "Create and save a new optimization plan to the database. "
+                "You MUST call this tool whenever the user agrees to a plan — "
+                "describing a plan in text does NOT save it. "
+                "Call after: (1) you detected a pattern, (2) user confirmed the cause, "
+                "(3) user agreed to the actions. The plan is only real once this tool is called."
             ),
             "parameters": {
                 "type": "object",
@@ -260,6 +267,26 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_plan",
+            "description": (
+                "Delete/cancel the subscriber's optimization plan. "
+                "You MUST call this tool whenever the user wants to cancel, delete, or remove a plan — "
+                "saying 'I deleted it' in text does NOT delete it. Only this tool call actually removes it. "
+                "If plan_id is not provided, deletes the latest active plan."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "plan_id": {"type": "integer", "description": "Plan ID (optional, defaults to active plan)"},
+                },
+                "required": ["phone"],
+            },
+        },
+    },
 ]
 
 
@@ -276,6 +303,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         create_optimization_plan,
         get_active_plan,
         check_progress,
+        delete_plan,
     )
     from rag.retriever import search
 
@@ -300,9 +328,17 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "get_consumption_summary":
             sub = get_sub(tool_input["phone"])
             analyzer = MeterAnalyzer(sub)
-            result = analyzer.get_consumption_summary(
-                days=tool_input.get("days", 30)
-            )
+            start_date = tool_input.get("start_date")
+            end_date = tool_input.get("end_date")
+            if start_date and end_date:
+                result = analyzer.get_consumption_summary(
+                    start_date=_date.fromisoformat(start_date),
+                    end_date=_date.fromisoformat(end_date),
+                )
+            else:
+                result = analyzer.get_consumption_summary(
+                    days=tool_input.get("days", 30)
+                )
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "get_daily_detail":
@@ -383,6 +419,11 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "check_plan_progress":
             sub = get_sub(tool_input["phone"])
             result = check_progress(sub, tool_input["plan_id"])
+            return json.dumps(result, ensure_ascii=False, default=str)
+
+        elif tool_name == "delete_plan":
+            sub = get_sub(tool_input["phone"])
+            result = delete_plan(sub, tool_input.get("plan_id"))
             return json.dumps(result, ensure_ascii=False, default=str)
 
         else:

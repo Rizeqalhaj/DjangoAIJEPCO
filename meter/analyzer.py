@@ -10,8 +10,8 @@ from datetime import date, timedelta
 from collections import defaultdict
 from django.db.models import Sum, Avg, Max, Min, Count, F, Q
 from django.db.models.functions import TruncDate, ExtractHour
-from django.utils import timezone
 
+from core.clock import now as clock_now
 from tariff.engine import calculate_residential_bill, JORDAN_TZ
 
 
@@ -27,6 +27,8 @@ class MeterAnalyzer:
         if not qs.exists():
             return {
                 "date": str(target_date),
+                "no_data": True,
+                "message": f"No meter readings found for {target_date}. Data may not exist for this date.",
                 "total_kwh": 0,
                 "peak_kwh": 0,
                 "off_peak_kwh": 0,
@@ -107,7 +109,7 @@ class MeterAnalyzer:
 
     def detect_spikes(self, days: int = 7, threshold_factor: float = 1.5) -> list:
         """Find unusual consumption spikes in last N days."""
-        now = timezone.now()
+        now = clock_now()
         recent_start = now - timedelta(days=days)
         baseline_start = now - timedelta(days=30 + days)
 
@@ -125,7 +127,8 @@ class MeterAnalyzer:
         # Fallback: if not enough historical data, use all available data
         if not baseline:
             baseline_qs = self.readings.filter(
-                timestamp__gte=now - timedelta(days=30)
+                timestamp__gte=now - timedelta(days=30),
+                timestamp__lte=now,
             ).annotate(
                 hour=ExtractHour('timestamp', tzinfo=JORDAN_TZ)
             ).values('hour').annotate(
@@ -138,7 +141,8 @@ class MeterAnalyzer:
 
         # Recent readings
         recent = self.readings.filter(
-            timestamp__gte=recent_start
+            timestamp__gte=recent_start,
+            timestamp__lte=now,
         ).order_by('timestamp')
 
         # Find spike readings
@@ -205,10 +209,10 @@ class MeterAnalyzer:
 
     def detect_recurring_pattern(self, days: int = 14) -> list:
         """Find patterns that repeat daily or weekly."""
-        now = timezone.now()
+        now = clock_now()
         start = now - timedelta(days=days)
 
-        qs = self.readings.filter(timestamp__gte=start)
+        qs = self.readings.filter(timestamp__gte=start, timestamp__lte=now)
         if not qs.exists():
             return []
 
@@ -397,7 +401,7 @@ class MeterAnalyzer:
 
     def get_bill_forecast(self, days_in_month: int = 30) -> dict:
         """Forecast end-of-month bill based on current month's data."""
-        now = timezone.now()
+        now = clock_now()
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Current month data
@@ -473,16 +477,34 @@ class MeterAnalyzer:
 
         return result
 
-    def get_consumption_summary(self, days: int = 30) -> dict:
-        """High-level consumption summary for agent context."""
-        now = timezone.now()
-        start = now - timedelta(days=days)
+    def get_consumption_summary(self, days: int = 30, start_date: date = None, end_date: date = None) -> dict:
+        """High-level consumption summary for agent context.
 
-        qs = self.readings.filter(timestamp__gte=start)
+        If start_date and end_date are provided, uses those exact boundaries
+        (e.g. for a specific calendar month). Otherwise falls back to
+        rolling last N days.
+        """
+        now = clock_now()
+
+        if start_date and end_date:
+            qs = self.readings.filter(
+                timestamp__date__gte=start_date,
+                timestamp__date__lte=end_date,
+            )
+            period_days = (end_date - start_date).days + 1
+            period_label = f"{start_date} to {end_date}"
+        else:
+            start = now - timedelta(days=days)
+            qs = self.readings.filter(timestamp__gte=start, timestamp__lte=now)
+            period_days = days
+            period_label = f"last {days} days"
 
         if not qs.exists():
             return {
-                "period_days": days,
+                "period_days": period_days,
+                "period_label": period_label,
+                "no_data": True,
+                "message": f"No meter readings found for {period_label}.",
                 "total_kwh": 0,
                 "avg_daily_kwh": 0,
                 "avg_daily_cost_fils": 0,
@@ -555,7 +577,8 @@ class MeterAnalyzer:
                     trend_percent_per_week = round(change_pct / (weeks / 2), 1)
 
         return {
-            "period_days": days,
+            "period_days": period_days,
+            "period_label": period_label,
             "total_kwh": round(total_kwh, 1),
             "avg_daily_kwh": avg_daily_kwh,
             "avg_daily_cost_fils": avg_daily_cost,

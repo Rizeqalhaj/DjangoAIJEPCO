@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePlans } from "@/hooks/use-plans";
 import { useT } from "@/i18n";
+import { formatDate } from "@/lib/format-date";
+import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const BADGE_STYLE: Record<string, string> = {
@@ -19,6 +24,20 @@ export default function PlansPage() {
   const t = useT();
   const sub = useAuthStore((s) => s.user?.subscriber?.subscription_number ?? "");
   const { data: plans, isLoading } = usePlans(sub);
+  const queryClient = useQueryClient();
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  async function handleCancel(planId: number) {
+    if (!confirm(t.plans.confirmCancel)) return;
+    setCancellingId(planId);
+    try {
+      await api.delete(`/plans/detail/${planId}/`);
+      queryClient.invalidateQueries({ queryKey: ["plans", sub] });
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
   const label: Record<string, string> = {
     active: t.plans.active, monitoring: t.plans.monitoring,
     verified: t.plans.verified, completed: t.plans.completed, abandoned: t.plans.abandoned,
@@ -81,9 +100,20 @@ export default function PlansPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground border-t pt-3">
-                <span>{t.plans.created}: {new Date(p.created_at).toLocaleDateString()}</span>
-                {p.verify_after_date && <span>{t.plans.verifyBy}: {p.verify_after_date}</span>}
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t pt-3">
+                <span>{t.plans.created}: {formatDate(p.created_at)}</span>
+                {p.verify_after_date && <span>{t.plans.verifyBy}: {formatDate(p.verify_after_date)}</span>}
+                {(p.status === "active" || p.status === "monitoring") && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="ms-auto h-7 text-xs"
+                    disabled={cancellingId === p.id}
+                    onClick={() => handleCancel(p.id)}
+                  >
+                    {cancellingId === p.id ? "..." : t.plans.cancel}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

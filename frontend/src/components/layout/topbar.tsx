@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { useT } from "@/i18n";
 import { useCurrentTou } from "@/hooks/use-tariff";
 import { useLanguageStore } from "@/stores/language-store";
+import { useTimeOverride } from "@/hooks/use-time-override";
 import { LanguageToggle } from "./language-toggle";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +52,58 @@ function TouIndicator() {
   );
 }
 
+function TimeTravelWidget() {
+  const { isOverridden, currentTime, isSettingTime, setTime, resetTime } =
+    useTimeOverride();
+  const [dateInput, setDateInput] = useState("");
+
+  const handleSet = () => {
+    if (dateInput) {
+      setTime(dateInput);
+    }
+  };
+
+  const displayDate = currentTime
+    ? new Date(currentTime).toLocaleDateString("en-CA")
+    : "";
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+        isOverridden
+          ? "bg-purple-100 text-purple-800 ring-1 ring-purple-300"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      <span>{isOverridden ? "\u23F0" : "\u{1F9EA}"}</span>
+      <input
+        type="date"
+        value={dateInput || displayDate}
+        onChange={(e) => setDateInput(e.target.value)}
+        className="bg-transparent border-none text-xs w-28 focus:outline-none"
+      />
+      <button
+        onClick={handleSet}
+        disabled={!dateInput || isSettingTime}
+        className="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[10px] font-medium hover:bg-purple-700 disabled:opacity-40"
+      >
+        Set
+      </button>
+      {isOverridden && (
+        <button
+          onClick={() => {
+            resetTime();
+            setDateInput("");
+          }}
+          className="px-1.5 py-0.5 rounded bg-gray-500 text-white text-[10px] font-medium hover:bg-gray-600"
+        >
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
 function UserAvatar({ name }: { name: string }) {
   const initial = name.charAt(0).toUpperCase();
 
@@ -77,6 +131,7 @@ export function Topbar() {
     <header className="h-14 bg-white flex items-center justify-between px-4 shadow-sm">
       <div className="flex items-center gap-3">
         <TouIndicator />
+        <TimeTravelWidget />
       </div>
 
       <div className="flex items-center gap-3">

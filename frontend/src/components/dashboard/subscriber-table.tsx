@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { AdminSubscriber } from "@/types/api";
 import { useT } from "@/i18n";
+import { formatDate } from "@/lib/format-date";
 import { Badge } from "@/components/ui/badge";
 
 function StatusBadge({ verified }: { verified: boolean }) {
@@ -93,7 +94,7 @@ export function SubscriberTable({
               </td>
               <td className="p-3 text-xs text-muted-foreground">
                 {sub.last_reading_at
-                  ? new Date(sub.last_reading_at).toLocaleDateString()
+                  ? formatDate(sub.last_reading_at)
                   : "---"}
               </td>
               <td className="p-3">

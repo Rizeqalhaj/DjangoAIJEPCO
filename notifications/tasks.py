@@ -4,9 +4,9 @@ import logging
 from datetime import timedelta
 
 from celery import shared_task
-from django.utils import timezone
 
 from accounts.models import Subscriber
+from core.clock import now as clock_now
 from meter.analyzer import MeterAnalyzer
 from plans.models import OptimizationPlan
 from plans.services import check_progress
@@ -50,7 +50,7 @@ def _send_weekly_report_to(subscriber):
     analyzer = MeterAnalyzer(subscriber)
 
     summary = analyzer.get_consumption_summary(days=7)
-    now = timezone.now()
+    now = clock_now()
 
     # Compare this week vs last week
     this_week_start = (now - timedelta(days=7)).date()
@@ -81,7 +81,6 @@ def _send_weekly_report_to(subscriber):
     message = template.format(
         avg_daily_kwh=summary["avg_daily_kwh"],
         total_kwh=summary["total_kwh"],
-        avg_daily_cost_fils=summary["avg_daily_cost_fils"],
         change_line=change_line,
     )
 
@@ -133,7 +132,7 @@ def _send_spike_alert_to(subscriber) -> bool:
 @shared_task
 def check_plan_verifications():
     """Check and verify plans that have reached their verification date."""
-    today = timezone.now().date()
+    today = clock_now().date()
 
     plans = OptimizationPlan.objects.filter(
         status__in=["active", "monitoring"],
@@ -144,6 +143,9 @@ def check_plan_verifications():
     for plan in plans:
         try:
             if not plan.subscriber.is_verified:
+                continue
+
+            if not plan.subscriber.wants_plan_checkups:
                 continue
 
             _verify_and_notify(plan)
@@ -165,13 +167,11 @@ def _verify_and_notify(plan):
 
     plan.status = "verified"
     plan.verification_result = {
-        "verified_at": timezone.now().isoformat(),
+        "verified_at": clock_now().isoformat(),
         "baseline_daily_kwh": progress["baseline_daily_kwh"],
         "final_daily_kwh": progress["current_daily_kwh"],
         "change_percent": progress["change_percent"],
         "improved": progress["is_improving"],
-        "estimated_monthly_savings_fils": progress["estimated_monthly_savings_fils"],
-        "estimated_monthly_savings_jod": progress["estimated_monthly_savings_jod"],
         "days_monitored": progress["days_monitored"],
     }
     plan.save()
@@ -179,6 +179,11 @@ def _verify_and_notify(plan):
     subscriber = plan.subscriber
     is_ar = subscriber.language == "ar"
     improved = progress["is_improving"]
+
+    # Calculate kWh savings for the message
+    baseline = progress["baseline_daily_kwh"]
+    current = progress["current_daily_kwh"]
+    savings_kwh = round(abs(baseline - current), 2)
 
     if improved:
         template = PLAN_RESULT_IMPROVED_AR if is_ar else PLAN_RESULT_IMPROVED_EN
@@ -188,7 +193,7 @@ def _verify_and_notify(plan):
     message = template.format(
         plan_summary=plan.plan_summary[:100],
         change_percent=abs(progress["change_percent"]),
-        savings_jod=progress["estimated_monthly_savings_jod"],
+        savings_kwh=savings_kwh,
     )
 
     send_text(subscriber.phone_number, message)

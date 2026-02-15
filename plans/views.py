@@ -1,4 +1,4 @@
-"""Plans API views — list optimization plans for a subscriber."""
+"""Plans API views — list and manage optimization plans."""
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from accounts.models import Subscriber
 from plans.models import OptimizationPlan
+from plans.services import delete_plan
 
 
 class SubscriberPlansView(APIView):
@@ -50,3 +51,31 @@ class SubscriberPlansView(APIView):
             }
             for p in plans
         ])
+
+
+class PlanDetailView(APIView):
+    """DELETE /api/plans/detail/<plan_id>/ — cancel a plan."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, plan_id):
+        try:
+            plan = OptimizationPlan.objects.get(id=plan_id)
+        except OptimizationPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=404)
+
+        subscriber = plan.subscriber
+
+        if not request.user.is_staff:
+            if not (
+                hasattr(request.user, "subscriber_profile")
+                and request.user.subscriber_profile == subscriber
+            ):
+                return Response({"error": "Access denied"}, status=403)
+
+        result = delete_plan(subscriber, plan_id)
+
+        if "error" in result:
+            return Response(result, status=400)
+
+        return Response(result)

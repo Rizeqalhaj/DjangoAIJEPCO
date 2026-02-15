@@ -174,10 +174,14 @@ ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 # Groq (free LLM API for development)
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 
+# Google Gemini (primary LLM)
+GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
+
 # Twilio WhatsApp
 TWILIO_ACCOUNT_SID = env('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN = env('TWILIO_AUTH_TOKEN', default='')
 TWILIO_WHATSAPP_NUMBER = env('TWILIO_WHATSAPP_NUMBER', default='whatsapp:+14155238886')
+WHATSAPP_DRY_RUN = env.bool('WHATSAPP_DRY_RUN', default=True)
 
 # ChromaDB
 CHROMA_PERSIST_DIR = env('CHROMA_PERSIST_DIR', default='./chroma_data')
@@ -186,13 +190,33 @@ CHROMA_PERSIST_DIR = env('CHROMA_PERSIST_DIR', default='./chroma_data')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} | {message}',
+            'style': '{',
+            'datefmt': '%H:%M:%S',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'agent': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'plans': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'meter': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'tariff': {
             'handlers': ['console'],
             'level': 'INFO',
         },
@@ -205,6 +229,10 @@ LOGGING = {
             'level': 'INFO',
         },
         'rag': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'core': {
             'handlers': ['console'],
             'level': 'INFO',
         },

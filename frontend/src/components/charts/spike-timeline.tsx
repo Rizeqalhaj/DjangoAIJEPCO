@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { SpikeEvent } from "@/types/api";
 import { useT } from "@/i18n";
+import { formatDateTime } from "@/lib/format-date";
 
 interface ChartEntry {
   time: string;
@@ -61,11 +62,7 @@ export function SpikeTimeline({ spikes }: { spikes: SpikeEvent[] }) {
   const t = useT();
 
   const data: ChartEntry[] = spikes.map((s) => ({
-    time: new Date(s.timestamp).toLocaleDateString("en", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-    }),
+    time: formatDateTime(s.timestamp),
     power_kw: s.power_kw,
     baseline_kw: s.baseline_kw,
     factor: s.spike_factor,

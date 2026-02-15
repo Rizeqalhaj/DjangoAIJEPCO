@@ -1,4 +1,8 @@
-"""WhatsApp message sender using Twilio SDK."""
+"""WhatsApp message sender using Twilio SDK.
+
+When TWILIO_ACCOUNT_SID is not set, messages are logged to the console
+instead of being sent (dry-run mode for local development).
+"""
 
 import logging
 
@@ -9,6 +13,13 @@ from twilio.base.exceptions import TwilioRestException
 logger = logging.getLogger(__name__)
 
 MAX_BUTTONS = 3
+
+
+def _is_dry_run() -> bool:
+    """True when WHATSAPP_DRY_RUN=True or Twilio credentials are missing."""
+    if getattr(settings, "WHATSAPP_DRY_RUN", False):
+        return True
+    return not getattr(settings, "TWILIO_ACCOUNT_SID", "")
 
 
 def _get_client() -> Client:
@@ -27,18 +38,28 @@ def send_text(phone: str, text: str) -> str | None:
     Send a plain text message via Twilio WhatsApp.
 
     Returns the message SID on success, None on failure.
+    In dry-run mode (no Twilio creds), logs the message to console.
     """
+    if _is_dry_run():
+        logger.info(
+            "[DRY-RUN WhatsApp] To: %s\n%s\n%s",
+            phone, "-" * 40, text,
+        )
+        return "dry-run"
+
     try:
+        logger.debug("[WhatsApp] Sending to %s: %s", phone, text[:80])
         client = _get_client()
         message = client.messages.create(
             from_=settings.TWILIO_WHATSAPP_NUMBER,
             body=text,
             to=_to_whatsapp(phone),
         )
+        logger.info("[WhatsApp] Sent to %s (SID: %s)", phone, message.sid)
         return message.sid
     except TwilioRestException as exc:
         logger.error(
-            "Twilio API error %s: %s", exc.status, exc.msg,
+            "[WhatsApp] FAILED to %s — Twilio error %s: %s", phone, exc.status, exc.msg,
         )
         return None
     except Exception:

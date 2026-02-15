@@ -640,7 +640,138 @@ class IngestManagementCommandTest(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# I. Message Templates Tests
+# I. Delete Plan Tests
+# ---------------------------------------------------------------------------
+
+class DeletePlanTest(TestCase):
+    """Test delete_plan service function."""
+
+    def setUp(self):
+        self.sub = _create_subscriber(
+            subscription_number="01-500010-01",
+            phone_number="+962795000010",
+        )
+        _seed_readings(self.sub, days=14)
+        self.plan = _create_plan(self.sub)
+
+    @patch("plans.services.send_text")
+    def test_delete_active_plan(self, mock_send):
+        from plans.services import delete_plan
+        plan_id = self.plan.id
+        result = delete_plan(self.sub, plan_id)
+        self.assertEqual(result["status"], "deleted")
+        self.assertFalse(OptimizationPlan.objects.filter(id=plan_id).exists())
+
+    @patch("plans.services.send_text")
+    def test_delete_sends_whatsapp(self, mock_send):
+        from plans.services import delete_plan
+        mock_send.return_value = "SM123"
+        summary = self.plan.plan_summary
+        delete_plan(self.sub, self.plan.id)
+        mock_send.assert_called_once()
+        message = mock_send.call_args[0][1]
+        self.assertIn(summary[:50], message)
+
+    @patch("plans.services.send_text")
+    def test_delete_nonexistent_plan(self, mock_send):
+        from plans.services import delete_plan
+        result = delete_plan(self.sub, 99999)
+        self.assertIn("error", result)
+
+    @patch("plans.services.send_text")
+    def test_delete_defaults_to_active_plan(self, mock_send):
+        from plans.services import delete_plan
+        plan_id = self.plan.id
+        result = delete_plan(self.sub)
+        self.assertEqual(result["plan_id"], plan_id)
+        self.assertEqual(result["status"], "deleted")
+        self.assertFalse(OptimizationPlan.objects.filter(id=plan_id).exists())
+
+    @patch("plans.services.send_text")
+    def test_delete_no_active_plan(self, mock_send):
+        from plans.services import delete_plan
+        self.plan.status = "completed"
+        self.plan.save()
+        result = delete_plan(self.sub)
+        self.assertIn("error", result)
+
+    @patch("plans.services.send_text")
+    def test_delete_arabic_notification(self, mock_send):
+        from plans.services import delete_plan
+        self.sub.language = "ar"
+        self.sub.save()
+        mock_send.return_value = "SM123"
+        delete_plan(self.sub, self.plan.id)
+        message = mock_send.call_args[0][1]
+        self.assertIn("تم إلغاء الخطة", message)
+
+    @patch("plans.services.send_text")
+    def test_delete_also_removes_checkpoints(self, mock_send):
+        from plans.services import delete_plan, check_progress
+        check_progress(self.sub, self.plan.id)
+        self.assertEqual(PlanCheckpoint.objects.filter(plan=self.plan).count(), 1)
+        delete_plan(self.sub, self.plan.id)
+        self.assertEqual(PlanCheckpoint.objects.filter(plan_id=self.plan.id).count(), 0)
+
+
+# ---------------------------------------------------------------------------
+# J. Delete Plan Agent Tool Test
+# ---------------------------------------------------------------------------
+
+class DeletePlanToolTest(TestCase):
+    """Test delete_plan tool execution via agent tools."""
+
+    def setUp(self):
+        self.sub = _create_subscriber(
+            subscription_number="01-500011-01",
+            phone_number="+962795000011",
+        )
+        _seed_readings(self.sub, days=14)
+        self.plan = _create_plan(self.sub)
+
+    @patch("plans.services.send_text")
+    def test_execute_delete_plan_tool(self, mock_send):
+        import json
+        from agent.tools import execute_tool
+        result = json.loads(execute_tool("delete_plan", {
+            "phone": self.sub.phone_number,
+            "plan_id": self.plan.id,
+        }))
+        self.assertEqual(result["status"], "deleted")
+
+    @patch("plans.services.send_text")
+    def test_execute_delete_plan_tool_no_plan_id(self, mock_send):
+        import json
+        from agent.tools import execute_tool
+        result = json.loads(execute_tool("delete_plan", {
+            "phone": self.sub.phone_number,
+        }))
+        self.assertEqual(result["status"], "deleted")
+        self.assertEqual(result["plan_id"], self.plan.id)
+
+
+# ---------------------------------------------------------------------------
+# K. Plan Deleted Template Tests
+# ---------------------------------------------------------------------------
+
+class PlanDeletedTemplateTest(TestCase):
+    """Test plan deleted message templates."""
+
+    def test_deleted_en_formats(self):
+        from notifications.message_templates import PLAN_ABANDONED_EN
+        msg = PLAN_ABANDONED_EN.format(plan_summary="Shift EV charging")
+        self.assertIn("Plan Cancelled", msg)
+        self.assertIn("Shift EV charging", msg)
+
+    def test_deleted_ar_formats(self):
+        from notifications.message_templates import PLAN_ABANDONED_AR
+        msg = PLAN_ABANDONED_AR.format(plan_summary="تحويل شحن السيارة")
+        self.assertIn("تم إلغاء الخطة", msg)
+        self.assertIn("تحويل شحن السيارة", msg)
+
+
+# ---------------------------------------------------------------------------
+# L. Message Templates Tests
 # ---------------------------------------------------------------------------
 
 class MessageTemplatesTest(TestCase):
@@ -651,7 +782,6 @@ class MessageTemplatesTest(TestCase):
         msg = WEEKLY_REPORT_AR.format(
             avg_daily_kwh=25.5,
             total_kwh=178.5,
-            avg_daily_cost_fils=850,
             change_line="test",
         )
         self.assertIn("25.5", msg)
@@ -662,7 +792,6 @@ class MessageTemplatesTest(TestCase):
         msg = WEEKLY_REPORT_EN.format(
             avg_daily_kwh=25.5,
             total_kwh=178.5,
-            avg_daily_cost_fils=850,
             change_line="test",
         )
         self.assertIn("Weekly Consumption Report", msg)
@@ -677,7 +806,7 @@ class MessageTemplatesTest(TestCase):
         msg = PLAN_RESULT_IMPROVED_EN.format(
             plan_summary="Shift EV charging",
             change_percent=20.0,
-            savings_jod=5.0,
+            savings_kwh=5.0,
         )
         self.assertIn("20.0", msg)
         self.assertIn("5.0", msg)
@@ -687,6 +816,5 @@ class MessageTemplatesTest(TestCase):
         msg = PLAN_RESULT_NOT_IMPROVED_EN.format(
             plan_summary="Shift EV charging",
             change_percent=5.0,
-            savings_jod=0,
         )
         self.assertIn("5.0", msg)

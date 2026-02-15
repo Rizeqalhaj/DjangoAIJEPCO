@@ -1,14 +1,16 @@
-"""LLM client wrapper — uses Groq (free) for development."""
+"""LLM client wrapper — uses Gemini via OpenAI-compatible endpoint."""
 
 import logging
 
-from groq import Groq
+from openai import OpenAI
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-MAIN_MODEL = "llama-3.3-70b-versatile"
-FAST_MODEL = "llama-3.1-8b-instant"
+MAIN_MODEL = "gemini-2.0-flash"
+FAST_MODEL = "gemini-2.0-flash"
+
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 MAX_LLM_RETRIES = 1
 
@@ -19,8 +21,11 @@ class LLMError(Exception):
 
 
 def _get_client():
-    """Lazily create Groq client."""
-    return Groq(api_key=settings.GROQ_API_KEY)
+    """Lazily create OpenAI client pointed at Gemini endpoint."""
+    return OpenAI(
+        api_key=settings.GEMINI_API_KEY,
+        base_url=GEMINI_BASE_URL,
+    )
 
 
 def chat_with_tools(
@@ -50,7 +55,14 @@ def chat_with_tools(
     last_exc = None
     for attempt in range(MAX_LLM_RETRIES + 1):
         try:
-            return _get_client().chat.completions.create(**kwargs)
+            logger.debug("[LLM] API call: model=%s, msgs=%d, tools=%d",
+                         model, len(full_messages), len(tools) if tools else 0)
+            result = _get_client().chat.completions.create(**kwargs)
+            logger.debug("[LLM] Response: finish_reason=%s, usage=%s",
+                         result.choices[0].finish_reason,
+                         f"{result.usage.prompt_tokens}in/{result.usage.completion_tokens}out"
+                         if result.usage else "n/a")
+            return result
         except Exception as exc:
             last_exc = exc
             logger.warning(
@@ -65,7 +77,7 @@ def chat_with_tools(
 
 def classify_fast(prompt: str, system: str = "") -> str:
     """
-    Quick classification using a fast model. Returns raw text response.
+    Quick classification using the fast model. Returns raw text response.
 
     Retries once on transient errors. Raises LLMError on persistent failure.
     """
@@ -77,11 +89,13 @@ def classify_fast(prompt: str, system: str = "") -> str:
     last_exc = None
     for attempt in range(MAX_LLM_RETRIES + 1):
         try:
+            logger.debug("[LLM] Fast classify: model=%s", FAST_MODEL)
             response = _get_client().chat.completions.create(
                 model=FAST_MODEL,
                 max_tokens=200,
                 messages=messages,
             )
+            logger.debug("[LLM] Fast result: %s", response.choices[0].message.content[:100])
             return response.choices[0].message.content
         except Exception as exc:
             last_exc = exc
