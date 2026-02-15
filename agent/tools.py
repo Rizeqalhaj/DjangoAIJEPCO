@@ -304,6 +304,69 @@ TOOLS = [
             },
         },
     },
+    # --- Notes tools (long-term memory) ---
+    {
+        "type": "function",
+        "function": {
+            "name": "save_note",
+            "description": (
+                "Save a learned fact about the user for long-term memory across sessions. "
+                "Use when user mentions: specific appliances (water heater, AC, EV charger), "
+                "daily schedule/habits, savings goals, household composition. "
+                "Do NOT save trivial things (greetings) or data already in subscriber_info."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["appliance", "schedule", "preference", "household_fact", "goal"],
+                        "description": "Category of the fact",
+                    },
+                    "content": {"type": "string", "description": "The fact to remember, in English"},
+                },
+                "required": ["phone", "category", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_notes",
+            "description": (
+                "Get all saved notes about a subscriber. Notes are also auto-injected into "
+                "your context, but use this tool to explicitly refresh if needed."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number"},
+                },
+                "required": ["phone"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_note",
+            "description": (
+                "Update or deactivate a saved note. Use when user corrects a previous fact "
+                "(e.g. 'I sold my EV') — update the content or set is_active=false to remove it."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "note_id": {"type": "integer", "description": "ID of the note to update"},
+                    "content": {"type": "string", "description": "New content (optional)"},
+                    "is_active": {"type": "boolean", "description": "Set to false to deactivate"},
+                },
+                "required": ["phone", "note_id"],
+            },
+        },
+    },
 ]
 
 
@@ -451,6 +514,49 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             sub = get_sub(tool_input["phone"])
             result = delete_plan(sub, tool_input.get("plan_id"))
             return json.dumps(result, ensure_ascii=False, default=str)
+
+        elif tool_name == "save_note":
+            from agent.notes_service import save_note as svc_save_note
+            sub = get_sub(tool_input["phone"])
+            note = svc_save_note(
+                subscriber=sub,
+                category=tool_input["category"],
+                content=tool_input["content"],
+            )
+            return json.dumps({
+                "note_id": note.id,
+                "status": "saved",
+                "category": note.category,
+                "content": note.content,
+            }, ensure_ascii=False)
+
+        elif tool_name == "get_notes":
+            from agent.notes_service import get_active_notes
+            sub = get_sub(tool_input["phone"])
+            notes = get_active_notes(sub)
+            return json.dumps({
+                "count": len(notes),
+                "notes": [
+                    {
+                        "note_id": n.id,
+                        "category": n.category,
+                        "content": n.content,
+                        "created_at": str(n.created_at),
+                    }
+                    for n in notes
+                ],
+            }, ensure_ascii=False)
+
+        elif tool_name == "update_note":
+            from agent.notes_service import update_note as svc_update_note
+            sub = get_sub(tool_input["phone"])
+            result = svc_update_note(
+                subscriber=sub,
+                note_id=tool_input["note_id"],
+                content=tool_input.get("content"),
+                is_active=tool_input.get("is_active"),
+            )
+            return json.dumps(result, ensure_ascii=False)
 
         else:
             return json.dumps({"error": f"Unknown tool: {tool_name}"})

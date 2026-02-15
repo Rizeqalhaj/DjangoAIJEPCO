@@ -21,7 +21,7 @@ The full PRD is in `KahrabaAI_Smart_Energy_Detective_PRD.md` at the project root
 | Phase 5: Investigation & Plan Engine | PARTIAL | Notifications, plan verification, delete_plan, scheduled tasks, knowledge ingestion, 66 tests |
 | Phase 6: Polish & Demo | PARTIAL | Time-travel testing, edge case fixes, dynamic language, dashboard, custom date ranges, 44 tests |
 
-**Total tests: 336 (all passing)**
+**Total tests: 373 (all passing)**
 
 ---
 
@@ -46,8 +46,11 @@ The full PRD is in `KahrabaAI_Smart_Energy_Detective_PRD.md` at the project root
 ### LLM Integration (Gemini via OpenAI-compatible endpoint)
 The LLM client at `core/llm_client.py` uses the OpenAI SDK pointed at Gemini's endpoint. All tool definitions use `{"type": "function", "function": {...}}` format (OpenAI-compatible, NOT Anthropic's `input_schema` format).
 
-### Conversation State
-Uses Django's cache framework (`agent/conversation.py`). On this machine it falls back to LocMemCache (in-memory, lost on server restart). When Redis is available, it auto-detects and uses RedisCache.
+### Conversation State (Persistent)
+Uses Django's cache framework (`agent/conversation.py`) as the hot path, with **database fallback** for persistence. On cache miss (server restart, TTL expiry), `_load_from_db()` reconstructs conversation state from the last 10 turns of the most recent active `ConversationSession`. Every turn is persisted to DB via `save_turn()` in `coach.py`. Sessions auto-expire after 30 minutes of inactivity. When Redis is available, it auto-detects and uses RedisCache.
+
+### Subscriber Notes (Long-term Memory)
+`agent/notes_service.py` provides CRUD for `SubscriberNote` — facts the agent learns about users across sessions (appliances, schedules, goals, preferences, household facts). Capped at 10 active notes per subscriber. Notes are auto-injected into the system prompt via `format_notes_for_prompt()` in `coach.py`, so the agent sees them at session start without calling a tool. Three agent tools (`save_note`, `get_notes`, `update_note`) let the agent manage notes during conversations.
 
 ### RAG Stub
 `rag/retriever.py` has 10 hardcoded energy tips with keyword search. Phase 5 replaces this with ChromaDB vector search.
@@ -94,14 +97,18 @@ KahrabaAIDjango/
 │   ├── engine.py        # TariffEngine: calculate_bill, get_tou_period, estimate_cost
 │   ├── urls.py          # /api/tariff/current|calculate
 │   └── views.py
-├── agent/               # AI Agent (Phase 3)
+├── agent/               # AI Agent (Phase 3+)
+│   ├── models.py        # ConversationSession, ConversationTurn, SubscriberNote
 │   ├── coach.py         # EnergyDetective: main agent class with tool-use loop + guardrail integration
 │   ├── guardrails.py    # Post-response validation (language mixing, tool usage, plan creation/deletion)
 │   ├── intent.py        # Intent classifier (7 intents incl. plan_management, uses fast model)
 │   ├── prompts.py       # System prompt (bilingual Arabic/English)
-│   ├── tools.py         # 14 tool definitions (OpenAI format) + execute_tool()
-│   ├── conversation.py  # ConversationManager (Django cache, 30-min TTL)
-│   ├── urls.py          # /api/agent/chat/
+│   ├── tools.py         # 18 tool definitions (OpenAI format) + execute_tool()
+│   ├── conversation.py  # ConversationManager (Django cache + DB fallback, 30-min TTL)
+│   ├── notes_service.py # Subscriber notes CRUD + prompt formatting
+│   ├── dashboard_views.py # Conversation history + notes REST APIs
+│   ├── admin.py         # Admin for ConversationSession, ConversationTurn, SubscriberNote
+│   ├── urls.py          # /api/agent/chat/, conversations/, notes/
 │   └── views.py         # AgentChatView (POST)
 ├── plans/               # Optimization plans
 │   ├── models.py        # OptimizationPlan, PlanCheckpoint
@@ -139,6 +146,8 @@ KahrabaAIDjango/
 │   ├── test_phase4.py   # 56 tests (Twilio webhook, sender, tasks, registration, edge cases)
 │   ├── test_phase5.py   # 66 tests (notifications, plan services, agent edge cases)
 │   ├── test_phase6.py   # 44 tests (dashboard, time-travel, custom date ranges)
+│   ├── test_feature_conversations.py # 17 tests (persistent conversations, DB fallback, dashboard APIs)
+│   ├── test_feature_notes.py  # 19 tests (subscriber notes CRUD, tools, dashboard APIs)
 │   ├── test_tariff_engine.py  # Tariff engine unit tests
 │   └── test_meter_analyzer.py # Meter analyzer unit tests
 ├── .env.example         # Template — copy to .env and fill in keys
@@ -180,7 +189,7 @@ python manage.py seed_demo
 # Optional: subscriber #6 with washing machine pattern (90 days)
 python manage.py seed_washer
 
-# 8. Run tests (all 336 should pass)
+# 8. Run tests (all 373 should pass)
 python manage.py test
 
 # 9. Start dev server
@@ -210,6 +219,10 @@ python manage.py runserver
 | GET | `/api/plans/<sub_number>/` | List subscriber's plans |
 | DELETE | `/api/plans/detail/<plan_id>/` | Delete a plan |
 | POST | `/api/notifications/trigger/` | Trigger notifications (staff-only) |
+| GET | `/api/agent/conversations/<sub_number>/` | List conversation sessions |
+| GET | `/api/agent/conversations/<sub_number>/<session_id>/` | Full turns for a session |
+| GET | `/api/agent/notes/<sub_number>/` | List active subscriber notes |
+| DELETE | `/api/agent/notes/<sub_number>/<note_id>/` | Deactivate a note |
 | GET/POST/DELETE | `/api/debug/time/` | Time-travel override (get/set/clear) |
 
 ---
@@ -252,8 +265,10 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 - The agent chat endpoint can take 5-30 seconds to respond (multiple LLM calls for intent + reasoning + tools).
 - All LLM calls are mocked in tests — no API key needed to run tests.
 - The system prompt in `agent/prompts.py` is bilingual (Arabic/English) and designed for WhatsApp-style concise messages.
-- The agent has 14 tools it can call. Tool definitions are in OpenAI format in `agent/tools.py`.
+- The agent has 18 tools it can call (15 original + 3 notes tools). Tool definitions are in OpenAI format in `agent/tools.py`.
 - Post-response guardrails (`agent/guardrails.py`) catch language mixing, missing tool calls, unsaved plans, and undeleted plans before responses reach the user.
+- Conversation history is persisted to DB (`agent/models.py`: ConversationSession, ConversationTurn) and survives server restarts via DB fallback in `agent/conversation.py`.
+- Subscriber notes (long-term memory) are auto-injected into the system prompt. The agent saves facts about users (appliances, schedules, goals) via `save_note` tool and they persist across sessions.
 - Subscriber ID 1 phone was changed to `+962798494038` for live WhatsApp testing.
 - Subscriber #6 (+962791000006, رنا الحسيني) has a washing machine pattern: 2kW spike at 20:00-21:00 daily for 90 days. Created via `python manage.py seed_washer`.
 - Data range for subscriber 1: 2025-11-12 to 2026-02-10 (no data after Feb 10).
@@ -331,6 +346,11 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 **Problem:** The Arabic plan-creation regex used standalone `خطة` (plan) which matched any mention of "plan" — including when the agent was checking or referencing an existing plan, not creating a new one.
 **Fix:** Narrowed Arabic regex to specific plan-creation phrases only (خطة التوفير, خطة تحسين, فترة المراقبة, هاي الخطة, الإجراءات التالية). Similarly, delete-check user patterns now require "plan" context.
 **Files:** `agent/guardrails.py` (`_PLAN_DESCRIBED_AR`, `_USER_DELETE_EN`, `_USER_DELETE_AR`)
+
+### 15. LLM claims it has no memory / can't see previous conversations
+**Problem:** After server restart (cache wiped), the DB fallback correctly reconstructs conversation history and passes it to the LLM, but the LLM responds "I don't have access to previous conversations" — a false humility hallucination.
+**Fix:** Added explicit rule to the Conversation Awareness section of the system prompt: "You HAVE access to the user's conversation history — it is in the message history above. NEVER claim you cannot see previous messages."
+**Files:** `agent/prompts.py` (## Conversation Awareness section)
 
 ---
 

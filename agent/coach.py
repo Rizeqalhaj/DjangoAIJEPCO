@@ -90,8 +90,9 @@ class EnergyDetective:
 
         # 4-5. Call LLM with tool loop
         logger.debug("[Agent] Starting LLM tool loop (language=%s)", language)
+        tools_used = []
         try:
-            final_text = self._run_tool_loop(history, phone, language)
+            final_text, tools_used = self._run_tool_loop(history, phone, language)
         except LLMError:
             logger.exception("[Agent] LLM failure for phone=%s", phone)
             final_text = FALLBACK_MESSAGES.get(language, FALLBACK_MESSAGES["ar"])
@@ -105,6 +106,16 @@ class EnergyDetective:
         state["language"] = language
         state["last_intent"] = intent_result.get("intent")
         self.conv_manager.save_state(phone, state)
+
+        # Persist turn to database
+        intent_str = intent_result.get("intent", "")
+        try:
+            self.conv_manager.save_turn(
+                phone, message, final_text, intent_str,
+                tools_used, language, state,
+            )
+        except Exception:
+            logger.exception("[Agent] Failed to persist turn for phone=%s", phone)
 
         # Update subscriber language preference so notifications match
         self._update_subscriber_language(phone, language)
@@ -123,8 +134,8 @@ class EnergyDetective:
         except Exception:
             pass
 
-    def _run_tool_loop(self, history: list, phone: str = "", language: str = "ar") -> str:
-        """Execute the LLM call and tool-use loop. May raise LLMError."""
+    def _run_tool_loop(self, history: list, phone: str = "", language: str = "ar") -> tuple[str, list[str]]:
+        """Execute the LLM call and tool-use loop. Returns (final_text, tool_names_called). May raise LLMError."""
         if language == "en":
             system = (
                 "## LANGUAGE RULE (HIGHEST PRIORITY)\n"
@@ -156,6 +167,18 @@ class EnergyDetective:
                 f"Phone: {phone}\n"
                 f"IMPORTANT: When calling any tool, use phone=\"{phone}\" as the phone parameter."
             )
+
+            # Inject subscriber notes (long-term memory)
+            try:
+                from agent.notes_service import format_notes_for_prompt
+                from accounts.models import Subscriber
+                sub = Subscriber.objects.filter(phone_number=phone).first()
+                if sub:
+                    notes_block = format_notes_for_prompt(sub)
+                    if notes_block:
+                        system += f"\n\n{notes_block}"
+            except Exception:
+                logger.debug("[Agent] Failed to load subscriber notes, continuing without them")
 
         # Sanitize cached history: strip tool call/response messages from
         # previous turns (they lack the 'name' field Gemini requires).
@@ -363,7 +386,7 @@ class EnergyDetective:
             history.pop()  # remove correction user msg
             history.pop()  # remove original assistant msg
 
-        return final_text
+        return final_text, all_tool_names
 
     @staticmethod
     def _build_correction_prompt(violations: list[dict], language: str) -> str:
