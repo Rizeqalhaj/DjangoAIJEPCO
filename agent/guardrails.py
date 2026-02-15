@@ -120,21 +120,32 @@ def check_plan_saved(
 
 
 # --- Plan deletion validation ---
+# Arabic morphology creates many word forms. Use root-based matching:
+# - خط[ةطت] matches: خطة (plan), خطط (plans), خطت* (possessive base: خطتك, خطتي)
+# - [أا]لغ matches both ألغ (with hamza) and الغ (without, common in informal Arabic)
+_PLAN_NOUN_AR = r'(?:ال)?خط[ةطت]'
 
-_DELETE_KEYWORDS_EN = re.compile(
-    r'\b(cancel|delete|remove|cancelled|deleted|removed)\b.*\b(plan)\b',
+# Agent claims it deleted/cancelled (regardless of what user asked)
+_AGENT_CLAIMED_DELETE_EN = re.compile(
+    r'\b(cancel(?:led)?|delet(?:ed|ing)|remov(?:ed|ing)|'
+    r'(?:I\'ve |I have )?(?:cancelled|deleted|removed))\b.*\b(plan)',
     re.IGNORECASE,
 )
-_DELETE_KEYWORDS_AR = re.compile(
-    r'(إلغاء|حذف|ألغ|حذفت|تم إلغاء|تم حذف).*(خطة|الخطة)',
+_AGENT_CLAIMED_DELETE_AR = re.compile(
+    # Pattern 1: verb ... plan_noun (e.g., "تم إلغاء خطتك")
+    rf'(تم إلغاء|تم حذف|لغيت|حذفت|ملغي|ملغية|إلغاء|[أا]لغ).*({_PLAN_NOUN_AR})|'
+    # Pattern 2: plan_noun ... adjective (e.g., "كل الخطط ملغية")
+    rf'({_PLAN_NOUN_AR}).*(ملغي|ملغية|محذوف|محذوفة)|'
+    # Pattern 3: verb+pronoun suffix (e.g., "لغيتهم" = cancelled them)
+    r'(لغيت|حذفت|[أا]لغيت)(هم|ها|هن)',
 )
 
-
+# User requests deletion
 _USER_DELETE_EN = re.compile(
-    r'\b(cancel|delete|remove)\b.*\b(plan)\b', re.IGNORECASE,
+    r'\b(cancel|delete|remove)\b.*\b(plan)', re.IGNORECASE,
 )
 _USER_DELETE_AR = re.compile(
-    r'(إلغاء|حذف|ألغ|شيل).*(خطة|الخطة|بلان)',
+    rf'([أا]لغ|لغ[يى]|إلغاء|حذف|شيل).*({_PLAN_NOUN_AR}|بلان)',
 )
 
 
@@ -145,29 +156,42 @@ def check_plan_deleted(
     language: str,
 ) -> dict | None:
     """
-    Check if the user asked to delete/cancel a plan but the agent didn't call delete_plan.
+    Check if the agent claims to have deleted a plan without calling delete_plan.
+
+    Triggers in two scenarios:
+    1. User asked to delete AND agent confirmed deletion — but no delete_plan called
+    2. Agent claims deletion in its response — but no delete_plan called
 
     Returns None if OK, or a dict with details if there's a violation.
     """
-    # If the agent already checked the plan status (get_active_plan), it may have
-    # found no plan to delete — don't flag this as a violation.
+    if "delete_plan" in tool_names_called:
+        return None
+
+    # If the agent checked plan status and found nothing, don't flag
     if "get_active_plan" in tool_names_called:
         return None
 
-    # Check if user asked to delete (require "plan" context)
-    user_pattern = _USER_DELETE_EN if language == "en" else _USER_DELETE_AR
-    user_asked_delete = user_pattern.search(user_message)
-
-    # Check if response confirms deletion without calling the tool
-    resp_pattern = _DELETE_KEYWORDS_EN if language == "en" else _DELETE_KEYWORDS_AR
-    response_confirms = resp_pattern.search(response_text)
-
-    if user_asked_delete and response_confirms and "delete_plan" not in tool_names_called:
+    # Scenario 1: agent CLAIMS deletion without calling the tool
+    claim_pattern = _AGENT_CLAIMED_DELETE_EN if language == "en" else _AGENT_CLAIMED_DELETE_AR
+    if claim_pattern.search(response_text):
         return {
             "issue": "plan_not_deleted",
-            "detail": "User asked to delete a plan and agent confirmed but did not call delete_plan tool",
+            "detail": "Agent claimed plan is deleted/cancelled but did not call delete_plan tool",
             "severity": "high",
         }
+
+    # Scenario 2: user asked to delete and agent responded affirmatively (no explicit claim)
+    user_pattern = _USER_DELETE_EN if language == "en" else _USER_DELETE_AR
+    if user_pattern.search(user_message) and "delete_plan" not in tool_names_called:
+        # Only flag if agent didn't push back or ask for clarification
+        pushback = re.search(r'(\?|which|sure|confirm|أي |متأكد|تأكيد)', response_text, re.IGNORECASE)
+        if not pushback:
+            return {
+                "issue": "plan_not_deleted",
+                "detail": "User asked to delete a plan but agent did not call delete_plan or ask for clarification",
+                "severity": "high",
+            }
+
     return None
 
 

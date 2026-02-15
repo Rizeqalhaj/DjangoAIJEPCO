@@ -39,16 +39,19 @@ def send_text(phone: str, text: str) -> str | None:
 
     Returns the message SID on success, None on failure.
     In dry-run mode (no Twilio creds), logs the message to console.
+    Always prints the message to the terminal for visibility.
     """
+    # Always print to terminal so messages are visible during development
+    print(f"\n{'='*50}")
+    print(f"📱 WhatsApp → {phone}")
+    print(f"{'─'*50}")
+    print(text)
+    print(f"{'='*50}\n")
+
     if _is_dry_run():
-        logger.info(
-            "[DRY-RUN WhatsApp] To: %s\n%s\n%s",
-            phone, "-" * 40, text,
-        )
         return "dry-run"
 
     try:
-        logger.debug("[WhatsApp] Sending to %s: %s", phone, text[:80])
         client = _get_client()
         message = client.messages.create(
             from_=settings.TWILIO_WHATSAPP_NUMBER,

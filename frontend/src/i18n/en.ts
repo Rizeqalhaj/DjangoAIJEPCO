@@ -101,6 +101,10 @@ export const en = {
     verifyBy: "Verify By",
     cancel: "Cancel Plan",
     confirmCancel: "Are you sure you want to cancel this plan?",
+    triggerVerify: "Run Plan Verification",
+    verifying: "Checking...",
+    verifySuccess: "Verified {count} plan(s)",
+    verifyNone: "No plans due for verification yet",
   },
   admin: {
     title: "Admin Dashboard",

@@ -5,6 +5,7 @@ Generates realistic 15-minute interval smart meter readings
 for 5 predefined subscriber profiles.
 """
 
+import logging
 import random
 import numpy as np
 from datetime import datetime, timedelta
@@ -12,6 +13,8 @@ from zoneinfo import ZoneInfo
 
 from meter.models import MeterReading
 from tariff.engine import get_tou_period, JORDAN_TZ
+
+logger = logging.getLogger(__name__)
 
 PROFILES = {
     "ev_peak_charger": {
@@ -161,3 +164,84 @@ def generate_meter_data(subscriber, profile_name: str, days: int = 90) -> list:
             ))
 
     return readings
+
+
+def generate_plan_improvement_data(subscriber, start_date, end_date, reduction_percent=15):
+    """
+    Generate reduced-consumption readings for the monitoring period of a plan.
+
+    Copies the subscriber's existing consumption pattern but scales it down
+    by reduction_percent (default 15%). Deletes any existing readings in the
+    date range first, then inserts the reduced versions.
+
+    Args:
+        subscriber: Subscriber model instance.
+        start_date: date object — first day of monitoring.
+        end_date: date object — last day of monitoring (inclusive).
+        reduction_percent: How much to reduce consumption (10-20 typical).
+    """
+    from core.clock import now as clock_now
+
+    tz = JORDAN_TZ
+    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=tz)
+    # end is inclusive, so go to end of that day
+    end_dt = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=tz)
+
+    days = (end_date - start_date).days + 1
+    if days < 1:
+        return
+
+    # Find a reference period of the same length BEFORE the plan start
+    ref_start = start_dt - timedelta(days=days)
+    ref_end = start_dt
+
+    ref_readings = list(
+        MeterReading.objects.filter(
+            subscriber=subscriber,
+            timestamp__gte=ref_start,
+            timestamp__lt=ref_end,
+        ).order_by("timestamp")
+    )
+
+    if not ref_readings:
+        logger.warning("No reference readings found for subscriber %s", subscriber.phone_number)
+        return
+
+    # Delete existing readings in the monitoring period
+    deleted, _ = MeterReading.objects.filter(
+        subscriber=subscriber,
+        timestamp__gte=start_dt,
+        timestamp__lt=end_dt,
+    ).delete()
+
+    # Create new readings scaled down with some variance
+    scale = 1 - (reduction_percent / 100)
+    new_readings = []
+
+    for ref in ref_readings:
+        # Shift the timestamp forward by `days` days
+        new_ts = ref.timestamp + timedelta(days=days)
+        if new_ts >= end_dt:
+            break
+
+        # Apply reduction with small random variance (±3%)
+        jitter = 1.0 + random.uniform(-0.03, 0.03)
+        new_kwh = max(0.01, ref.kwh * scale * jitter)
+        new_power = max(0.01, ref.power_kw * scale * jitter)
+
+        tou_info = get_tou_period(new_ts)
+        new_readings.append(MeterReading(
+            subscriber=subscriber,
+            timestamp=new_ts,
+            kwh=round(new_kwh, 4),
+            power_kw=round(new_power, 2),
+            tou_period=tou_info["period"],
+            is_simulated=True,
+        ))
+
+    if new_readings:
+        MeterReading.objects.bulk_create(new_readings, ignore_conflicts=True)
+        logger.info(
+            "Generated %d improved readings for %s (-%d%%)",
+            len(new_readings), subscriber.phone_number, reduction_percent,
+        )

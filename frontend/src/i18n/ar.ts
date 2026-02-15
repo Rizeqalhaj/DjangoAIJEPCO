@@ -103,6 +103,10 @@ export const ar: Translations = {
     verifyBy: "التحقق بحلول",
     cancel: "إلغاء الخطة",
     confirmCancel: "هل أنت متأكد من إلغاء هذه الخطة؟",
+    triggerVerify: "تشغيل التحقق من الخطط",
+    verifying: "جاري الفحص...",
+    verifySuccess: "تم التحقق من {count} خطة",
+    verifyNone: "لا توجد خطط مستحقة للتحقق بعد",
   },
   admin: {
     title: "لوحة الإدارة",

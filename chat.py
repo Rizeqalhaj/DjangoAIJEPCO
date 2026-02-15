@@ -11,11 +11,13 @@ django.setup()
 from agent.coach import EnergyDetective
 
 PHONES = {
-    "1": ("+962791000001", "Ahmed — residential family"),
-    "2": ("+962791000002", "Sara — EV owner"),
-    "3": ("+962791000003", "Abu Khalil — elderly couple"),
-    "4": ("+962791000004", "Lina — home office"),
-    "5": ("+962791000005", "Omar — wasteful teenager"),
+    "1": ("+962798494038", "Rezeq — live testing"),
+    "2": ("+962791000001", "Ahmed — residential family"),
+    "3": ("+962791000002", "Sara — EV owner"),
+    "4": ("+962791000003", "Abu Khalil — elderly couple"),
+    "5": ("+962791000004", "Lina — home office"),
+    "6": ("+962791000005", "Omar — wasteful teenager"),
+    "7": ("+962791000006", "Rana — washing machine pattern"),
 }
 
 print("\n=== KahrabaAI Terminal Chat ===\n")
@@ -24,7 +26,7 @@ for k, (phone, desc) in PHONES.items():
     print(f"  {k}) {phone}  {desc}")
 print()
 
-choice = input("Enter number (1-5): ").strip()
+choice = input("Enter number (1-7): ").strip()
 if choice not in PHONES:
     print("Invalid choice.")
     sys.exit(1)

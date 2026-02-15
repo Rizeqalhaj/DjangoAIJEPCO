@@ -1,12 +1,14 @@
 """Plan services for creating, retrieving, and checking optimization plans."""
 
 import logging
+import random
 from datetime import timedelta
 
 from core.clock import now as clock_now
 from plans.models import OptimizationPlan, PlanCheckpoint
 from meter.analyzer import MeterAnalyzer
 from tariff.engine import calculate_residential_bill
+from meter.generator import generate_plan_improvement_data
 from whatsapp.sender import send_text
 from notifications.message_templates import (
     PLAN_CREATED_AR,
@@ -56,6 +58,14 @@ def create_optimization_plan(subscriber, tool_input: dict) -> OptimizationPlan:
         baseline_monthly_cost_fils=int(baseline_monthly_cost),
         status='active',
         verify_after_date=clock_now().date() + timedelta(days=monitoring_days),
+    )
+
+    # Generate reduced-consumption data for the monitoring period (demo)
+    generate_plan_improvement_data(
+        subscriber,
+        start_date=plan.created_at.date() + timedelta(days=1),
+        end_date=plan.verify_after_date,
+        reduction_percent=random.randint(10, 18),
     )
 
     _send_plan_created_notification(subscriber, plan)

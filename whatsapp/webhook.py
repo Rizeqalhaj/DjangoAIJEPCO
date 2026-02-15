@@ -62,6 +62,9 @@ def verify_twilio_signature(request) -> bool:
 
     validator = RequestValidator(auth_token)
     url = request.build_absolute_uri()
+    # Behind a reverse proxy (ngrok), Django sees http:// but Twilio signs with https://
+    if request.headers.get("X-Forwarded-Proto") == "https" and url.startswith("http://"):
+        url = "https://" + url[len("http://"):]
     post_vars = request.POST.dict()
 
     return validator.validate(url, post_vars, signature)

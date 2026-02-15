@@ -26,6 +26,25 @@ export default function PlansPage() {
   const { data: plans, isLoading } = usePlans(sub);
   const queryClient = useQueryClient();
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+
+  async function handleTriggerVerify() {
+    setVerifying(true);
+    setVerifyMsg(null);
+    try {
+      const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+      const res = await fetch(`${BASE}/notifications/check-plans-open/`, { method: "POST" });
+      const data = await res.json();
+      const count = data.verified ?? 0;
+      setVerifyMsg(count > 0 ? t.plans.verifySuccess.replace("{count}", String(count)) : t.plans.verifyNone);
+      queryClient.invalidateQueries({ queryKey: ["plans", sub] });
+    } catch {
+      setVerifyMsg("Error triggering verification");
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   async function handleCancel(planId: number) {
     if (!confirm(t.plans.confirmCancel)) return;
@@ -73,7 +92,15 @@ export default function PlansPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t.plans.title}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">{t.plans.title}</h1>
+        <div className="flex items-center gap-3">
+          {verifyMsg && <span className="text-sm text-muted-foreground">{verifyMsg}</span>}
+          <Button onClick={handleTriggerVerify} disabled={verifying} variant="outline" size="sm">
+            {verifying ? t.plans.verifying : t.plans.triggerVerify}
+          </Button>
+        </div>
+      </div>
       {plans.map((p) => {
         const vr = p.verification_result as Record<string, number> | null;
         const cur = vr?.current_daily_kwh ?? null;

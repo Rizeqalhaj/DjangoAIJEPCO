@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.clock import now, set_override, clear_override, get_override, _original_now
+from notifications.tasks import check_plan_verifications
 
 JORDAN_TZ = timezone.get_fixed_timezone(180)  # UTC+3
 
@@ -56,7 +57,12 @@ def time_override_view(request):
         return Response({"error": "Provide 'date' or 'datetime' in request body."}, status=400)
 
     set_override(dt)
+
+    # Auto-run plan verification at the new simulated time
+    verified = check_plan_verifications()
+
     return Response({
         "current_time": dt.isoformat(),
         "is_overridden": True,
+        "plans_verified": verified,
     })

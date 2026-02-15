@@ -418,7 +418,8 @@ class EnergyDetective:
                 )
             elif v["issue"] == "plan_not_deleted":
                 parts.append(
-                    "The user asked to delete/cancel their plan but you did not call the delete_plan tool. "
-                    "Call delete_plan NOW to actually remove it from the database."
+                    "You claimed plans are deleted/cancelled but did not call the delete_plan tool. "
+                    "First call get_all_plans to find all plans, then call delete_plan for EACH one. "
+                    "You MUST actually call the tool — describing deletion in text is not enough."
                 )
         return " ".join(parts)

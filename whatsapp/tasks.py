@@ -53,15 +53,19 @@ def dispatch_message(phone: str, text: str, message_id: str = ""):
             return
         cache.set(dedup_key, True, DEDUP_TTL)
 
-    try:
-        process_incoming_message_task.delay(phone, text)
-        logger.info("Message dispatched to Celery for phone=%s", phone)
-    except Exception as exc:
-        logger.warning(
-            "Celery dispatch failed (%s), processing synchronously for phone=%s",
-            type(exc).__name__, phone,
-        )
-        _process_message_logic(phone, text)
+    if _celery_worker_available():
+        try:
+            process_incoming_message_task.delay(phone, text)
+            logger.info("Message dispatched to Celery for phone=%s", phone)
+            return
+        except Exception as exc:
+            logger.warning(
+                "Celery dispatch failed (%s), falling back to sync for phone=%s",
+                type(exc).__name__, phone,
+            )
+
+    logger.info("Processing synchronously for phone=%s", phone)
+    _process_message_logic(phone, text)
 
 
 def _process_message_logic(phone: str, text: str):
@@ -165,6 +169,25 @@ def _normalize_phone(phone: str) -> str:
     if not phone.startswith("+"):
         return f"+{phone}"
     return phone
+
+
+def _celery_worker_available() -> bool:
+    """Check if at least one Celery worker is consuming tasks. Cached for 60s."""
+    cache_key = "celery_worker_available"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        from config.celery import app
+        inspector = app.control.inspect(timeout=1.0)
+        active = inspector.active_queues()
+        available = bool(active)
+    except Exception:
+        available = False
+
+    cache.set(cache_key, available, 60)
+    return available
 
 
 def _looks_like_subscription_number(text: str) -> bool:
