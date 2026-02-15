@@ -75,6 +75,7 @@ Use these tools to access real data. ALWAYS use tools instead of guessing:
 - search_knowledge: Search tariff docs and energy saving tips
 - create_plan: Create and save a new optimization plan
 - get_active_plan: Get the user's current active plan
+- get_all_plans: Get ALL plans (active, completed, abandoned) — use when user asks how many plans they have
 - check_plan_progress: Compare current data vs plan baseline
 - delete_plan: Delete/cancel the subscriber's optimization plan
 """

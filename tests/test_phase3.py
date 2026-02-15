@@ -507,7 +507,7 @@ class ToolDefinitionsTest(TestCase):
 
     def test_tools_count(self):
         from agent.tools import TOOLS
-        self.assertEqual(len(TOOLS), 14)
+        self.assertEqual(len(TOOLS), 15)
 
     def test_all_tools_have_openai_format(self):
         from agent.tools import TOOLS

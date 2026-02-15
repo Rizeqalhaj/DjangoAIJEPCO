@@ -251,6 +251,23 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_all_plans",
+            "description": (
+                "Get ALL optimization plans for the subscriber (active, monitoring, completed, abandoned). "
+                "Use this when the user asks how many plans they have or wants to see their plan history."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "phone": {"type": "string", "description": "Phone number"},
+                },
+                "required": ["phone"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "check_plan_progress",
             "description": (
                 "Compare current consumption data against the plan's baseline to "
@@ -415,6 +432,15 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "actions": plan.plan_details.get("actions", []),
                 }, ensure_ascii=False)
             return json.dumps({"plan": None, "message": "No active plan"})
+
+        elif tool_name == "get_all_plans":
+            from plans.services import get_all_plans
+            sub = get_sub(tool_input["phone"])
+            plans = get_all_plans(sub)
+            return json.dumps({
+                "total": len(plans),
+                "plans": plans,
+            }, ensure_ascii=False)
 
         elif tool_name == "check_plan_progress":
             sub = get_sub(tool_input["phone"])

@@ -142,6 +142,25 @@ def get_active_plan(subscriber) -> OptimizationPlan | None:
     )
 
 
+def get_all_plans(subscriber) -> list[dict]:
+    """Return all plans for a subscriber, newest first."""
+    plans = (
+        OptimizationPlan.objects
+        .filter(subscriber=subscriber)
+        .order_by('-created_at')
+    )
+    return [
+        {
+            "plan_id": p.id,
+            "summary": p.plan_summary,
+            "status": p.status,
+            "created_at": str(p.created_at.date()),
+            "verify_after": str(p.verify_after_date) if p.verify_after_date else None,
+        }
+        for p in plans
+    ]
+
+
 def check_progress(subscriber, plan_id: int) -> dict:
     """
     Compare current consumption vs plan's baseline and record a checkpoint.
