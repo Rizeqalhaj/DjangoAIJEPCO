@@ -6,7 +6,7 @@ recurring pattern detection, period comparison, bill forecasting,
 and consumption summaries.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from collections import defaultdict
 from django.db.models import Sum, Avg, Max, Min, Count, F, Q
 from django.db.models.functions import TruncDate, ExtractHour
@@ -107,11 +107,20 @@ class MeterAnalyzer:
             "lowest_avg_kw": hourly_avg_kw[lowest_hour],
         }
 
-    def detect_spikes(self, days: int = 7, threshold_factor: float = 1.5) -> list:
-        """Find unusual consumption spikes in last N days."""
+    def detect_spikes(self, days: int = 7, threshold_factor: float = 1.5,
+                       start_date=None, end_date=None) -> list:
+        """Find unusual consumption spikes in last N days or a specific date range."""
         now = clock_now()
-        recent_start = now - timedelta(days=days)
-        baseline_start = now - timedelta(days=30 + days)
+        if start_date and end_date:
+            recent_start = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=JORDAN_TZ)
+            recent_end = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=JORDAN_TZ)
+            range_days = (end_date - start_date).days + 1
+            baseline_start = recent_start - timedelta(days=30)
+        else:
+            recent_start = now - timedelta(days=days)
+            recent_end = now
+            range_days = days
+            baseline_start = now - timedelta(days=30 + days)
 
         # Baseline: average power_kw by hour, EXCLUDING the recent period
         baseline_qs = self.readings.filter(
@@ -142,7 +151,7 @@ class MeterAnalyzer:
         # Recent readings
         recent = self.readings.filter(
             timestamp__gte=recent_start,
-            timestamp__lte=now,
+            timestamp__lte=recent_end if start_date else now,
         ).order_by('timestamp')
 
         # Find spike readings

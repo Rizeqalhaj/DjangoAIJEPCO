@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth-store";
-import { useSpikes } from "@/hooks/use-meter";
+import { useSpikes, type DateRange } from "@/hooks/use-meter";
 import { useT } from "@/i18n";
 import { formatDateTime } from "@/lib/format-date";
 import { SpikeTimeline } from "@/components/charts/spike-timeline";
@@ -22,13 +22,32 @@ function severityClass(factor: number): string {
   return "";
 }
 
+const RANGE_OPTIONS = [7, 14, 30, 60, 90] as const;
+
 export default function SpikesPage() {
   const [days, setDays] = useState(7);
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [showCustom, setShowCustom] = useState(false);
+  const [startInput, setStartInput] = useState("");
+  const [endInput, setEndInput] = useState("");
   const t = useT();
   const sub = useAuthStore(
     (s) => s.user?.subscriber?.subscription_number ?? ""
   );
-  const { data, isLoading } = useSpikes(sub, days);
+  const { data, isLoading } = useSpikes(sub, days, customRange);
+
+  const selectPreset = (d: number) => {
+    setDays(d);
+    setCustomRange(undefined);
+    setShowCustom(false);
+  };
+
+  const applyCustomRange = () => {
+    if (startInput && endInput) {
+      setCustomRange({ startDate: startInput, endDate: endInput });
+      setDays(0);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -41,19 +60,56 @@ export default function SpikesPage() {
             </Badge>
           )}
         </div>
-        <div className="flex gap-2">
-          {([7, 14, 30] as const).map((d) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {RANGE_OPTIONS.map((d) => (
             <Button
               key={d}
-              variant={days === d ? "default" : "outline"}
+              variant={!customRange && days === d ? "default" : "outline"}
               size="sm"
-              onClick={() => setDays(d)}
+              onClick={() => selectPreset(d)}
             >
               {d} {t.common.days}
             </Button>
           ))}
+          <Button
+            variant={showCustom || customRange ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowCustom(!showCustom)}
+          >
+            {t.dashboard.customRange}
+          </Button>
         </div>
       </div>
+
+      {showCustom && (
+        <div className="flex flex-wrap items-end gap-3 p-3 rounded-lg border bg-muted/30">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">{t.dashboard.from}</label>
+            <input
+              type="date"
+              value={startInput}
+              onChange={(e) => setStartInput(e.target.value)}
+              className="rounded-md border px-3 py-1.5 text-sm bg-background"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">{t.dashboard.to}</label>
+            <input
+              type="date"
+              value={endInput}
+              onChange={(e) => setEndInput(e.target.value)}
+              className="rounded-md border px-3 py-1.5 text-sm bg-background"
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={applyCustomRange}
+            disabled={!startInput || !endInput || startInput > endInput}
+          >
+            {t.dashboard.apply}
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">

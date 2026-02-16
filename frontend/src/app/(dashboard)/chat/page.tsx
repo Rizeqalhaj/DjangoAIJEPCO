@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useChatMutation } from "@/hooks/use-chat";
 import { useT } from "@/i18n";
+import Markdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,13 @@ export default function ChatPage() {
 
   const scroll = useCallback(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), []);
   useEffect(() => { scroll(); }, [msgs, chat.isPending, scroll]);
+
+  // Re-focus input when response arrives (isPending goes false)
+  useEffect(() => {
+    if (!chat.isPending) {
+      inputRef.current?.focus();
+    }
+  }, [chat.isPending]);
 
   const send = () => {
     const text = input.trim();
@@ -66,9 +74,15 @@ export default function ChatPage() {
             <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className="max-w-[80%] space-y-1">
                 {m.role === "assistant" && <p className="text-xs text-muted-foreground ps-1">{t.chat.botName}</p>}
-                <div className={`px-4 py-2.5 text-sm whitespace-pre-wrap ${
-                  m.role === "user" ? "bg-primary text-primary-foreground rounded-2xl rounded-ee-md" : "bg-muted rounded-2xl rounded-es-md"
-                }`}>{m.content}</div>
+                {m.role === "user" ? (
+                  <div className="px-4 py-2.5 text-sm whitespace-pre-wrap bg-primary text-primary-foreground rounded-2xl rounded-ee-md">
+                    {m.content}
+                  </div>
+                ) : (
+                  <div className="px-4 py-2.5 text-sm bg-muted rounded-2xl rounded-es-md prose prose-sm prose-neutral max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                    <Markdown>{m.content}</Markdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}

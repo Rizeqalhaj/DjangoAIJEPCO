@@ -3,7 +3,6 @@ import type { Translations } from "./en";
 export const ar: Translations = {
   nav: {
     dashboard: "لوحة التحكم",
-    consumption: "الاستهلاك",
     spikes: "الارتفاعات",
     forecast: "التوقعات",
     plans: "خطط التوفير",
@@ -29,6 +28,8 @@ export const ar: Translations = {
     from: "من",
     to: "إلى",
     apply: "تطبيق",
+    hourlyPattern: "نمط الاستهلاك بالساعة",
+    dailyConsumption: "الاستهلاك اليومي",
   },
   common: {
     kwh: "كيلوواط/ساعة",

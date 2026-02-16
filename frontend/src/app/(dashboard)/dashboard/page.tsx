@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth-store";
-import { useConsumptionSummary, useDailySeries, useSpikes, type DateRange } from "@/hooks/use-meter";
+import { useConsumptionSummary, useDailySeries, useSpikes, useHourlyProfile, type DateRange } from "@/hooks/use-meter";
 import { useAdminStats, useAdminSubscribers } from "@/hooks/use-admin";
 import { useT } from "@/i18n";
 import { formatDateTime } from "@/lib/format-date";
@@ -12,6 +12,7 @@ import { AdminStatsCards } from "@/components/dashboard/admin-stats-cards";
 import { SubscriberTable } from "@/components/dashboard/subscriber-table";
 import { DailyConsumptionChart } from "@/components/charts/daily-consumption-chart";
 import { TouBreakdownPie } from "@/components/charts/tou-breakdown-pie";
+import { HourlyProfileChart } from "@/components/charts/hourly-profile-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ function SubscriberView() {
   const { data: summary, isLoading: sl } = useConsumptionSummary(sub, days, customRange);
   const { data: daily, isLoading: dl } = useDailySeries(sub, days, customRange);
   const { data: spikesData } = useSpikes(sub, days);
+  const { data: hourlyData } = useHourlyProfile(sub, days, customRange);
 
   const selectPreset = (d: number) => {
     setDays(d);
@@ -80,8 +82,8 @@ function SubscriberView() {
   };
 
   const chartTitle = customRange
-    ? `${t.nav.consumption} — ${customRange.startDate} → ${customRange.endDate}`
-    : `${t.nav.consumption} — ${days} ${t.common.days}`;
+    ? `${t.dashboard.dailyConsumption} — ${customRange.startDate} → ${customRange.endDate}`
+    : `${t.dashboard.dailyConsumption} — ${days} ${t.common.days}`;
 
   if (sl || dl) return <PageSkeleton />;
   return (
@@ -150,6 +152,10 @@ function SubscriberView() {
           <CardContent>{summary ? <TouBreakdownPie data={summary} /> : <Skeleton className="h-56" />}</CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader><CardTitle>{t.dashboard.hourlyPattern}</CardTitle></CardHeader>
+        <CardContent>{hourlyData ? <HourlyProfileChart data={hourlyData} /> : <Skeleton className="h-80" />}</CardContent>
+      </Card>
       {spikesData && spikesData.count > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">

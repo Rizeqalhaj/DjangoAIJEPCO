@@ -60,16 +60,31 @@ class MeterDailyView(APIView):
 
 
 class MeterSpikesView(APIView):
-    """GET /api/meter/<subscription_number>/spikes/"""
+    """GET /api/meter/<subscription_number>/spikes/?days=7
+    or  GET /api/meter/<subscription_number>/spikes/?start_date=2026-01-01&end_date=2026-01-31
+    """
 
     def get(self, request, subscription_number):
         subscriber = get_object_or_404(
             Subscriber, subscription_number=subscription_number
         )
         analyzer = MeterAnalyzer(subscriber)
-        days = int(request.query_params.get('days', 7))
         threshold = float(request.query_params.get('threshold', 1.5))
-        spikes = analyzer.detect_spikes(days=days, threshold_factor=threshold)
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date and end_date:
+            try:
+                sd = datetime.strptime(start_date, '%Y-%m-%d').date()
+                ed = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            spikes = analyzer.detect_spikes(threshold_factor=threshold, start_date=sd, end_date=ed)
+        else:
+            days = int(request.query_params.get('days', 7))
+            spikes = analyzer.detect_spikes(days=days, threshold_factor=threshold)
         return Response({"spikes": spikes, "count": len(spikes)})
 
 
@@ -136,15 +151,29 @@ class MeterDailySeriesView(APIView):
 
 
 class MeterHourlyProfileView(APIView):
-    """GET /api/meter/<subscription_number>/hourly-profile/?days=14"""
+    """GET /api/meter/<subscription_number>/hourly-profile/?days=14
+    or  GET /api/meter/<subscription_number>/hourly-profile/?start_date=2026-01-01&end_date=2026-01-31
+    """
 
     def get(self, request, subscription_number):
         subscriber = get_object_or_404(
             Subscriber, subscription_number=subscription_number
         )
-        days = int(request.query_params.get("days", 14))
-        now = clock_now()
-        start = (now - timedelta(days=days)).date()
-        end = now.date()
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        if start_date and end_date:
+            try:
+                sd = datetime.strptime(start_date, '%Y-%m-%d').date()
+                ed = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            days = int(request.query_params.get("days", 14))
+            now = clock_now()
+            sd = (now - timedelta(days=days)).date()
+            ed = now.date()
         analyzer = MeterAnalyzer(subscriber)
-        return Response(analyzer.get_hourly_profile(start, end))
+        return Response(analyzer.get_hourly_profile(sd, ed))

@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 const NAV_ICONS: Record<string, string> = {
   dashboard: "\uD83D\uDCCA",
-  consumption: "\uD83D\uDD0B",
   spikes: "\uD83D\uDCC8",
   forecast: "\uD83D\uDCB0",
   plans: "\uD83D\uDCCB",
@@ -18,7 +17,6 @@ const NAV_ICONS: Record<string, string> = {
 
 const subscriberLinks = [
   { href: "/dashboard", key: "dashboard" as const },
-  { href: "/consumption", key: "consumption" as const },
   { href: "/spikes", key: "spikes" as const },
   { href: "/forecast", key: "forecast" as const },
   { href: "/plans", key: "plans" as const },

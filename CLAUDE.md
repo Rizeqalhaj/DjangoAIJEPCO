@@ -19,7 +19,7 @@ The full PRD is in `KahrabaAI_Smart_Energy_Detective_PRD.md` at the project root
 | Phase 3: AI Agent Core | COMPLETE | LLM client, intent classifier, 14 agent tools, tool-use loop, conversation state, RAG stub, guardrails, 53 tests |
 | Phase 4: WhatsApp Integration | COMPLETE | Twilio WhatsApp API, webhook, sender, Celery fallback, onboarding, message splitting, 56 tests |
 | Phase 5: Investigation & Plan Engine | PARTIAL | Notifications, plan verification, delete_plan, scheduled tasks, knowledge ingestion, 66 tests |
-| Phase 6: Polish & Demo | PARTIAL | Time-travel testing, edge case fixes, dynamic language, dashboard, custom date ranges, 44 tests |
+| Phase 6: Polish & Demo | PARTIAL | Time-travel testing, edge case fixes, dynamic language, dashboard, custom date ranges, spike summarization, proactive analysis, 44 tests |
 
 **Total tests: 373 (all passing)**
 
@@ -75,6 +75,21 @@ When high-severity violations are detected, `coach.py` automatically injects a c
 ### Custom Date Range Support
 `meter/analyzer.py` `get_consumption_summary()` accepts optional `start_date`/`end_date` for exact calendar month queries (e.g. "January 2026" → `2026-01-01` to `2026-01-31`). The `days` parameter is for rolling windows only. Backend API views and frontend hooks also support `?start_date=&end_date=` query params. The dashboard has a "Custom" date range picker alongside preset day buttons.
 
+### Proactive Multi-Tool Analysis
+When the user asks about their consumption/energy/bill, the agent proactively calls ALL relevant tools in the same turn: `get_consumption_summary`, `detect_spikes`, `detect_patterns`, AND `get_bill_forecast`. This gives a complete picture without requiring follow-up questions. Configured in `agent/prompts.py` (## Conversation Awareness section).
+
+### Spike Summarization (Tool Response Shaping)
+When `detect_spikes` finds 3+ spikes, the tool response in `agent/tools.py` strips the individual spike array and returns only a summary: count, common hour, power range, date range, TOU periods, and total extra cost. This forces the LLM to present a pattern summary instead of listing every spike individually. For 1-2 spikes, the full details are still returned.
+
+### Dashboard Consolidation
+The separate `/consumption` page was removed. The hourly consumption pattern chart was moved to the main dashboard page alongside the daily chart. The spikes page now has 5 preset buttons (7/14/30/60/90 days) plus a custom date range picker. The hourly profile backend view (`meter/views.py` HourlyProfileView) now supports `?start_date=&end_date=` query params.
+
+### Chat Markdown Rendering
+The chat page (`frontend/src/app/(dashboard)/chat/page.tsx`) renders agent responses as markdown using `react-markdown` with `@tailwindcss/typography` prose styling. This enables bold text, bullet points, and headings in agent responses. Auto-scrolls to latest message and auto-focuses the input field.
+
+### Plan Progress Auto-Detection
+`check_plan_progress` tool and `plans/services.py:check_progress()` accept optional `plan_id` — when omitted, they auto-detect the latest active/monitoring plan. Same pattern as `delete_plan`. This prevents the LLM from guessing/remembering stale plan IDs.
+
 ---
 
 ## Project Structure
@@ -94,8 +109,8 @@ KahrabaAIDjango/
 │   ├── analyzer.py      # MeterAnalyzer: summary, daily, spikes, patterns, forecast
 │   ├── generator.py     # Synthetic data generator (5 profiles)
 │   ├── serializers.py   # DRF serializers
-│   ├── urls.py          # /api/meter/<phone>/summary|daily|spikes|forecast
-│   └── views.py         # API views
+│   ├── urls.py          # /api/meter/<phone>/summary|daily|spikes|forecast|hourly-profile
+│   └── views.py         # API views (incl. HourlyProfileView with start_date/end_date support)
 ├── tariff/              # JEPCO tariff engine
 │   ├── engine.py        # TariffEngine: calculate_bill, get_tou_period, estimate_cost
 │   ├── urls.py          # /api/tariff/current|calculate
@@ -214,6 +229,7 @@ python manage.py runserver
 | GET | `/api/meter/<phone>/summary/` | Consumption summary (30 days default, supports `?start_date=&end_date=`) |
 | GET | `/api/meter/<phone>/daily/?date=YYYY-MM-DD` | Daily breakdown (also supports `?start_date=&end_date=` for series) |
 | GET | `/api/meter/<phone>/spikes/` | Spike detection |
+| GET | `/api/meter/<phone>/hourly-profile/` | Hourly consumption profile (supports `?start_date=&end_date=` or `?days=`) |
 | GET | `/api/meter/<phone>/forecast/` | Bill forecast |
 | GET | `/api/tariff/current/` | Current TOU period |
 | POST | `/api/tariff/calculate/` | Calculate bill `{"kwh": 500}` |
@@ -275,7 +291,10 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 - Subscriber ID 1 phone was changed to `+962798494038` for live WhatsApp testing.
 - Subscriber #6 (+962791000006, رنا الحسيني) has a washing machine pattern: 2kW spike at 20:00-21:00 daily for 90 days. Created via `python manage.py seed_washer`.
 - Data range for subscriber 1: 2025-11-12 to 2026-02-10 (no data after Feb 10).
-- Dashboard supports custom date range filtering with `start_date`/`end_date` query params on summary and daily series endpoints.
+- Dashboard supports custom date range filtering with `start_date`/`end_date` query params on summary, daily series, and hourly profile endpoints.
+- Consumption page removed — hourly chart moved to dashboard. Spikes page has 5 presets (7/14/30/60/90 days) + custom range.
+- Chat page renders agent responses as markdown (react-markdown + @tailwindcss/typography).
+- Plan IDs are shown in the Plans dashboard tab footer for each plan card.
 
 ---
 
@@ -369,6 +388,26 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 **Problem:** Twilio signs webhooks using the account's auth token. If you switch to a different Twilio account (different `TWILIO_ACCOUNT_SID`), the signature is computed with the new account's token but the server still validates with the old token → 401.
 **Diagnosis:** Compare `AccountSid` in the POST body with `TWILIO_ACCOUNT_SID` in `.env`. If they differ, credentials are stale. Use ngrok inspector (`http://127.0.0.1:4040`) to inspect request/response details.
 **Fix:** Update `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` in `.env` to match the new account, then restart Django + Celery (see issues #16 and #17).
+
+### 19. LLM reports wrong plan creation date when time-travel is active
+**Problem:** `core/clock.py` monkey-patches `django.utils.timezone.now`, so `auto_now_add=True` stores the overridden date. When the time override is later changed (e.g. from Feb 16 to Feb 22), the LLM sees "Current Date: Feb 22" and reports the plan was "created on Feb 22" instead of the actual stored date (Feb 16).
+**Fix:** (1) System prompt rule #3 expanded to include "plans" in the always-call-a-tool mandate. (2) New rule #10: "use the EXACT date returned by the tool. Do NOT substitute today's date." (3) Tool response renamed `created_at` to `created_on` and added `_note` field clarifying it's the actual stored date.
+**Files:** `agent/prompts.py` (rules #3 and #10), `agent/tools.py` (`get_active_plan` executor)
+
+### 20. Agent lists every spike individually instead of summarizing patterns
+**Problem:** When `detect_spikes` returned 10+ spikes, the LLM iterated and listed every single one despite system prompt instructions to summarize. Adding summary fields alongside raw data didn't help — the LLM used the raw array.
+**Fix:** Removed the individual spike array entirely from the tool response when 3+ spikes. The tool now returns only summary fields: count, common_hour, avg/peak power, date range, TOU periods. Key insight: LLMs will use raw data if available, regardless of instructions to summarize. "The LLM can't list what it doesn't have."
+**Files:** `agent/tools.py` (`detect_spikes` executor)
+
+### 21. Agent doesn't proactively analyze spikes/patterns for consumption questions
+**Problem:** When user asks "how is my consumption?" the agent only called `get_consumption_summary` and waited for follow-up questions about spikes or patterns.
+**Fix:** Updated system prompt Conversation Awareness section to explicitly mandate calling ALL four tools in the same turn: `get_consumption_summary`, `detect_spikes`, `detect_patterns`, AND `get_bill_forecast`.
+**Files:** `agent/prompts.py` (## Conversation Awareness section)
+
+### 22. `check_plan_progress` required plan_id — LLM guessed stale IDs
+**Problem:** `check_plan_progress` required `plan_id` as a mandatory parameter. The LLM would guess/remember old plan IDs from conversation history (e.g. ID 9 when active plan was ID 38), causing "Plan not found" errors.
+**Fix:** Made `plan_id` optional in three places: tool definition in `agent/tools.py` (removed from `required`), service function in `plans/services.py` (`plan_id: int | None = None`), and executor in `agent/tools.py` (`tool_input.get("plan_id")`). When omitted, defaults to the latest active/monitoring plan.
+**Files:** `agent/tools.py`, `plans/services.py`
 
 ---
 

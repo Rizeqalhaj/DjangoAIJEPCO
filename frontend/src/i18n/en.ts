@@ -1,7 +1,6 @@
 export const en = {
   nav: {
     dashboard: "Dashboard",
-    consumption: "Consumption",
     spikes: "Spikes",
     forecast: "Projection",
     plans: "Plans",
@@ -27,6 +26,8 @@ export const en = {
     from: "From",
     to: "To",
     apply: "Apply",
+    hourlyPattern: "Hourly Consumption Pattern",
+    dailyConsumption: "Daily Consumption",
   },
   common: {
     kwh: "kWh",

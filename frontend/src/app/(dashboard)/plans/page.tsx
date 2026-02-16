@@ -128,6 +128,7 @@ export default function PlansPage() {
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t pt-3">
+                <span>ID: {p.id}</span>
                 <span>{t.plans.created}: {formatDate(p.created_at)}</span>
                 {p.verify_after_date && <span>{t.plans.verifyBy}: {formatDate(p.verify_after_date)}</span>}
                 {(p.status === "active" || p.status === "monitoring") && (

@@ -70,15 +70,20 @@ TOOLS = [
         "function": {
             "name": "detect_spikes",
             "description": (
-                "Find unusual consumption spikes in the last N days. "
+                "Find unusual consumption spikes. "
                 "A spike is when power draw exceeds 2x the normal level for that hour. "
-                "Returns timestamp, magnitude, duration, TOU period, and estimated extra cost."
+                "Returns timestamp, magnitude, duration, TOU period, and estimated extra cost. "
+                "Use start_date/end_date when the user asks about a specific date or period. "
+                "Use days=30 for general spike questions. "
+                "NEVER use days=1 — use start_date/end_date for specific dates instead."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "phone": {"type": "string", "description": "Phone number"},
-                    "days": {"type": "integer", "description": "Number of days to analyze (default 7)"},
+                    "days": {"type": "integer", "description": "Number of days back from today. Use 30 for general questions."},
+                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Use with end_date for specific date ranges."},
+                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD. Use with start_date for specific date ranges."},
                 },
                 "required": ["phone"],
             },
@@ -272,15 +277,16 @@ TOOLS = [
             "description": (
                 "Compare current consumption data against the plan's baseline to "
                 "check if the plan is working. Returns baseline vs actual, "
-                "percentage change, and whether the target is being met."
+                "percentage change, and whether the target is being met. "
+                "If plan_id is not provided, checks the latest active plan automatically."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "phone": {"type": "string", "description": "Phone number"},
-                    "plan_id": {"type": "integer", "description": "Plan ID"},
+                    "plan_id": {"type": "integer", "description": "Plan ID (optional, defaults to active plan)"},
                 },
-                "required": ["phone", "plan_id"],
+                "required": ["phone"],
             },
         },
     },
@@ -431,8 +437,53 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "detect_spikes":
             sub = get_sub(tool_input["phone"])
             analyzer = MeterAnalyzer(sub)
-            result = analyzer.detect_spikes(days=tool_input.get("days", 7))
-            return json.dumps(result, ensure_ascii=False, default=str)
+            start_date = tool_input.get("start_date")
+            end_date = tool_input.get("end_date")
+            if start_date and end_date:
+                spikes = analyzer.detect_spikes(
+                    start_date=_date.fromisoformat(start_date),
+                    end_date=_date.fromisoformat(end_date),
+                )
+            else:
+                spikes = analyzer.detect_spikes(days=tool_input.get("days", 30))
+            # When 3+ spikes, send only a summary (no individual spike list)
+            # so the LLM presents the pattern, not a dump of every spike.
+            if len(spikes) >= 3:
+                powers = [s["power_kw"] for s in spikes]
+                hours = []
+                tou_periods = set()
+                total_extra_cost = 0
+                dates = []
+                for s in spikes:
+                    try:
+                        ts = s.get("timestamp", "")
+                        h = int(ts[11:13]) if len(ts) >= 13 else None
+                        if h is not None:
+                            hours.append(h)
+                        dates.append(ts[:10])
+                    except (ValueError, TypeError):
+                        pass
+                    tou_periods.add(s.get("tou_period", ""))
+                    total_extra_cost += s.get("estimated_extra_cost_fils", 0)
+                common_hour = max(set(hours), key=hours.count) if hours else None
+                response = {
+                    "count": len(spikes),
+                    "summary": (
+                        f"{len(spikes)} spikes detected"
+                        + (f", mostly around {common_hour}:00" if common_hour is not None else "")
+                        + (f" during {'/'.join(tou_periods)} hours" if tou_periods else "")
+                        + f", power range {min(powers)}-{max(powers)} kW"
+                        + f", total extra cost ~{round(total_extra_cost / 1000, 2)} JOD"
+                    ),
+                    "date_range": f"{dates[0]} to {dates[-1]}" if dates else "",
+                    "avg_power_kw": round(sum(powers) / len(powers), 2),
+                    "peak_power_kw": max(powers),
+                    "common_hour": f"{common_hour}:00" if common_hour is not None else None,
+                    "tou_periods": list(tou_periods),
+                }
+            else:
+                response = {"count": len(spikes), "spikes": spikes}
+            return json.dumps(response, ensure_ascii=False, default=str)
 
         elif tool_name == "detect_patterns":
             sub = get_sub(tool_input["phone"])
@@ -489,10 +540,11 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "plan_id": plan.id,
                     "summary": plan.plan_summary,
                     "status": plan.status,
-                    "created_at": str(plan.created_at.date()),
+                    "created_on": str(plan.created_at.date()),
                     "verify_after": str(plan.verify_after_date),
                     "user_hypothesis": plan.user_hypothesis,
                     "actions": plan.plan_details.get("actions", []),
+                    "_note": "created_on is the actual date this plan was saved. Report this exact date.",
                 }, ensure_ascii=False)
             return json.dumps({"plan": None, "message": "No active plan"})
 
@@ -507,7 +559,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "check_plan_progress":
             sub = get_sub(tool_input["phone"])
-            result = check_progress(sub, tool_input["plan_id"])
+            result = check_progress(sub, tool_input.get("plan_id"))
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "delete_plan":

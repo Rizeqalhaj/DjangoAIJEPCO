@@ -92,7 +92,7 @@ export default function AdminSubscriberPage({ params }: { params: Promise<{ id: 
       <StatsCards summary={summary} />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>{t.nav.consumption} — {days} {t.common.days}</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t.dashboard.dailyConsumption} — {days} {t.common.days}</CardTitle></CardHeader>
           <CardContent>{daily ? <DailyConsumptionChart data={daily} /> : <Skeleton className="h-56" />}</CardContent>
         </Card>
         <Card>

@@ -38,10 +38,10 @@ export function useDailySeries(sub: string, days = 14, range?: DateRange) {
   });
 }
 
-export function useSpikes(sub: string, days = 7) {
+export function useSpikes(sub: string, days = 7, range?: DateRange) {
   return useQuery<SpikesResponse>({
-    queryKey: ["meter", "spikes", sub, days],
-    queryFn: () => api.get(`/meter/${sub}/spikes/?days=${days}`).then((r) => r.data),
+    queryKey: ["meter", "spikes", sub, range ? `${range.startDate}_${range.endDate}` : days],
+    queryFn: () => api.get(`/meter/${sub}/spikes/?${buildParams(days, range)}`).then((r) => r.data),
     enabled: !!sub,
   });
 }
@@ -54,10 +54,10 @@ export function useBillForecast(sub: string) {
   });
 }
 
-export function useHourlyProfile(sub: string, days = 14) {
+export function useHourlyProfile(sub: string, days = 14, range?: DateRange) {
   return useQuery<HourlyProfile>({
-    queryKey: ["meter", "hourly-profile", sub, days],
-    queryFn: () => api.get(`/meter/${sub}/hourly-profile/?days=${days}`).then((r) => r.data),
+    queryKey: ["meter", "hourly-profile", sub, range ? `${range.startDate}_${range.endDate}` : days],
+    queryFn: () => api.get(`/meter/${sub}/hourly-profile/?${buildParams(days, range)}`).then((r) => r.data),
     enabled: !!sub,
   });
 }

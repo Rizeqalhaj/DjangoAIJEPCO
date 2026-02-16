@@ -171,20 +171,26 @@ def get_all_plans(subscriber) -> list[dict]:
     ]
 
 
-def check_progress(subscriber, plan_id: int) -> dict:
+def check_progress(subscriber, plan_id: int | None = None) -> dict:
     """
     Compare current consumption vs plan's baseline and record a checkpoint.
 
+    If plan_id is None, uses the latest active/monitoring plan.
     Creates a PlanCheckpoint record on each call for historical tracking.
 
     Returns dict with baseline_daily_kwh, current_daily_kwh,
     change_percent, on_track, is_improving, ready_for_verification,
     and estimated monthly savings.
     """
-    try:
-        plan = OptimizationPlan.objects.get(id=plan_id, subscriber=subscriber)
-    except OptimizationPlan.DoesNotExist:
-        return {"error": "Plan not found"}
+    if plan_id:
+        try:
+            plan = OptimizationPlan.objects.get(id=plan_id, subscriber=subscriber)
+        except OptimizationPlan.DoesNotExist:
+            return {"error": "Plan not found"}
+    else:
+        plan = get_active_plan(subscriber)
+        if not plan:
+            return {"error": "No active plan found"}
 
     analyzer = MeterAnalyzer(subscriber)
     days_since = (clock_now().date() - plan.created_at.date()).days
