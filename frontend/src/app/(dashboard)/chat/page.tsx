@@ -61,11 +61,11 @@ export default function ChatPage() {
   ];
 
   return (
-    <div className="space-y-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold">{t.chat.title}</h1>
-      <Card className="flex flex-col h-[calc(100dvh-180px)] md:h-[calc(100dvh-200px)]">
-        <CardHeader className="border-b py-3 shrink-0">
-          <CardTitle className="text-base">{t.chat.botName}</CardTitle>
+    <div className="space-y-2 md:space-y-4 max-w-3xl mx-auto">
+      <h1 className="text-lg md:text-2xl font-bold">{t.chat.title}</h1>
+      <Card className="flex flex-col h-[calc(100dvh-130px)] md:h-[calc(100dvh-200px)]">
+        <CardHeader className="border-b py-2 md:py-3 shrink-0">
+          <CardTitle className="text-sm md:text-base">{t.chat.botName}</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
           {msgs.length === 0 && !chat.isPending && (
