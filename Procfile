@@ -1,1 +1,1 @@
-web: python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.wsgi --bind 0.0.0.0:$PORT
+web: echo "=== MIGRATE ===" && python manage.py migrate --noinput && echo "=== COLLECTSTATIC ===" && python manage.py collectstatic --noinput && echo "=== STARTING GUNICORN on port $PORT ===" && gunicorn config.wsgi --bind 0.0.0.0:$PORT --log-level debug --access-logfile - --error-logfile -
