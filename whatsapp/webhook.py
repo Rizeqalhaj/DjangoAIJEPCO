@@ -85,12 +85,16 @@ def verify_twilio_signature(request) -> bool:
 
     validator = RequestValidator(auth_token)
     url = request.build_absolute_uri()
-    # Behind a reverse proxy (ngrok), Django sees http:// but Twilio signs with https://
-    if request.headers.get("X-Forwarded-Proto") == "https" and url.startswith("http://"):
+    # Behind a reverse proxy (Railway, ngrok), Django may see http:// but Twilio signs https://
+    # Always upgrade to https for production URLs
+    if url.startswith("http://") and not url.startswith("http://localhost"):
         url = "https://" + url[len("http://"):]
     post_vars = request.POST.dict()
 
-    return validator.validate(url, post_vars, signature)
+    is_valid = validator.validate(url, post_vars, signature)
+    if not is_valid:
+        logger.warning("Signature validation failed. URL used: %s", url)
+    return is_valid
 
 
 def _strip_whatsapp_prefix(phone: str) -> str:
