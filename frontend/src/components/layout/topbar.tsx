@@ -81,7 +81,7 @@ function TimeTravelWidget() {
         type="date"
         value={dateInput || displayDate}
         onChange={(e) => setDateInput(e.target.value)}
-        className="bg-transparent border-none text-xs w-28 focus:outline-none"
+        className="bg-transparent border-none text-xs w-24 sm:w-28 focus:outline-none"
       />
       <button
         onClick={handleSet}
@@ -133,9 +133,7 @@ export function Topbar() {
       <div className="flex items-center gap-2 md:gap-3">
         <MobileSidebar />
         <TouIndicator />
-        <div className="hidden md:flex">
-          <TimeTravelWidget />
-        </div>
+        <TimeTravelWidget />
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
