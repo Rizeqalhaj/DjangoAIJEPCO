@@ -8,6 +8,7 @@ import { useCurrentTou } from "@/hooks/use-tariff";
 import { useLanguageStore } from "@/stores/language-store";
 import { useTimeOverride } from "@/hooks/use-time-override";
 import { LanguageToggle } from "./language-toggle";
+import { MobileSidebar } from "./sidebar";
 import { Button } from "@/components/ui/button";
 
 const TOU_COLORS: Record<string, string> = {
@@ -128,18 +129,23 @@ export function Topbar() {
   const displayName = user?.subscriber?.name || user?.username || "";
 
   return (
-    <header className="h-14 bg-white flex items-center justify-between px-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <TouIndicator />
-        <TimeTravelWidget />
+    <header className="h-14 bg-white flex items-center justify-between px-3 md:px-4 shadow-sm">
+      <div className="flex items-center gap-2 md:gap-3">
+        <MobileSidebar />
+        <div className="hidden sm:flex">
+          <TouIndicator />
+        </div>
+        <div className="hidden md:flex">
+          <TimeTravelWidget />
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         <LanguageToggle />
 
         <div className="flex items-center gap-2">
           <UserAvatar name={displayName} />
-          <span className="text-sm font-medium text-foreground">
+          <span className="hidden sm:inline text-sm font-medium text-foreground">
             {displayName}
           </span>
         </div>

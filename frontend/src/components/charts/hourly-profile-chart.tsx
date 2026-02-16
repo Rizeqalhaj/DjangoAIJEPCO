@@ -54,8 +54,9 @@ export function HourlyProfileChart({ data }: { data: HourlyProfile }) {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <AreaChart data={hourly}>
+    <div className="h-56 sm:h-72 md:h-80">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={hourly}>
         <defs>
           <linearGradient id="kwGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -69,18 +70,21 @@ export function HourlyProfileChart({ data }: { data: HourlyProfile }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
         <XAxis
           dataKey="hour"
-          fontSize={11}
+          fontSize={10}
           tick={{ fill: "#4b5563" }}
           axisLine={{ stroke: "#d1d5db" }}
           tickLine={false}
-          tickFormatter={(v) => `${Number(v)}:00`}
+          interval="equidistantPreserveStart"
+          tickFormatter={(v) => `${Number(v)}h`}
         />
         <YAxis
-          fontSize={12}
+          fontSize={10}
           tick={{ fill: "#4b5563" }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `${Number(v)} kW`}
+          width={35}
+          tickFormatter={(v) => `${Number(v)}`}
+          label={{ value: "kW", position: "insideTopLeft", offset: -5, fontSize: 10, fill: "#6b7280" }}
         />
         <Tooltip content={<CustomTooltip />} />
         <ReferenceLine
@@ -115,7 +119,8 @@ export function HourlyProfileChart({ data }: { data: HourlyProfile }) {
           dot={false}
           activeDot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
         />
-      </AreaChart>
-    </ResponsiveContainer>
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

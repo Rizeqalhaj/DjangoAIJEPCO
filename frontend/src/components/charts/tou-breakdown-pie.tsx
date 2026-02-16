@@ -73,16 +73,17 @@ export function TouBreakdownPie({ data }: { data: ConsumptionSummary }) {
   ];
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <PieChart>
+    <div className="h-56 sm:h-64 md:h-72">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
         <Pie
           data={pieData}
           dataKey="value"
           nameKey="name"
           cx="50%"
-          cy="50%"
-          innerRadius={48}
-          outerRadius={95}
+          cy="45%"
+          innerRadius="32%"
+          outerRadius="65%"
           paddingAngle={2}
           label={renderLabel}
           labelLine={false}
@@ -95,7 +96,7 @@ export function TouBreakdownPie({ data }: { data: ConsumptionSummary }) {
         </Pie>
         <text
           x="50%"
-          y="50%"
+          y="45%"
           textAnchor="middle"
           dominantBaseline="central"
           className="fill-muted-foreground text-xs"
@@ -108,7 +109,8 @@ export function TouBreakdownPie({ data }: { data: ConsumptionSummary }) {
           iconSize={8}
           wrapperStyle={{ fontSize: 12, paddingTop: 4 }}
         />
-      </PieChart>
-    </ResponsiveContainer>
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

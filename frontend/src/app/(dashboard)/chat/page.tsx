@@ -63,7 +63,7 @@ export default function ChatPage() {
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold">{t.chat.title}</h1>
-      <Card className="flex flex-col" style={{ height: "calc(100vh - 200px)" }}>
+      <Card className="flex flex-col h-[calc(100dvh-180px)] md:h-[calc(100dvh-200px)]">
         <CardHeader className="border-b py-3 shrink-0">
           <CardTitle className="text-base">{t.chat.botName}</CardTitle>
         </CardHeader>

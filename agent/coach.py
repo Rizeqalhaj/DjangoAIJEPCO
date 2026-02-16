@@ -396,30 +396,36 @@ class EnergyDetective:
             if v["issue"] == "language_mixing":
                 if language == "en":
                     parts.append(
-                        "Your previous response contained Arabic text. "
-                        "Rewrite your ENTIRE response in English only — "
-                        "no Arabic words or phrases at all."
+                        "[SYSTEM: Response blocked — wrong language. "
+                        "Rewrite your ENTIRE response in English only. "
+                        "Do NOT apologize or mention a previous attempt — "
+                        "respond as if this is your first answer.]"
                     )
                 else:
                     parts.append(
-                        "ردك السابق كان فيه كلمات إنجليزية. "
-                        "أعد كتابة ردك كامل بالعربي فقط."
+                        "[SYSTEM: Response blocked — wrong language. "
+                        "أعد كتابة ردك كامل بالعربي فقط. "
+                        "لا تعتذر ولا تذكر أي محاولة سابقة — "
+                        "رد كأنه أول رد لك.]"
                     )
             elif v["issue"] == "no_tool_calls":
                 parts.append(
-                    "You answered a data question without calling any tools. "
-                    "You MUST call the appropriate tool to get real data. "
-                    "Do it now — call the tool and then answer with actual numbers."
+                    "[SYSTEM: Response blocked — tools were not called. "
+                    "Call the appropriate tools NOW to fetch real data, "
+                    "then write a FRESH response using the tool results. "
+                    "Do NOT apologize or reference any previous attempt — "
+                    "respond as if this is your first answer to the user.]"
                 )
             elif v["issue"] == "plan_not_saved":
                 parts.append(
-                    "You claimed the plan is saved but did not call the create_plan tool. "
-                    "Call create_plan NOW to actually save the plan to the database."
+                    "[SYSTEM: Response blocked — plan was not saved. "
+                    "Call create_plan NOW to save the plan, then write a FRESH response. "
+                    "Do NOT apologize or reference any previous attempt.]"
                 )
             elif v["issue"] == "plan_not_deleted":
                 parts.append(
-                    "You claimed plans are deleted/cancelled but did not call the delete_plan tool. "
-                    "First call get_all_plans to find all plans, then call delete_plan for EACH one. "
-                    "You MUST actually call the tool — describing deletion in text is not enough."
+                    "[SYSTEM: Response blocked — plan was not deleted. "
+                    "First call get_all_plans to find plans, then call delete_plan for EACH one. "
+                    "Then write a FRESH response. Do NOT apologize or reference any previous attempt.]"
                 )
         return " ".join(parts)

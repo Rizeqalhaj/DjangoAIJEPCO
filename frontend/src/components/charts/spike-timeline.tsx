@@ -75,8 +75,9 @@ export function SpikeTimeline({ spikes }: { spikes: SpikeEvent[] }) {
       : 0;
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <ComposedChart data={data} barGap={-20}>
+    <div className="h-56 sm:h-72 md:h-80">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} barGap={-20}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} />
         <XAxis
           dataKey="time"
@@ -125,7 +126,8 @@ export function SpikeTimeline({ spikes }: { spikes: SpikeEvent[] }) {
           radius={[3, 3, 0, 0]}
           barSize={16}
         />
-      </ComposedChart>
-    </ResponsiveContainer>
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

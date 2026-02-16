@@ -14,7 +14,7 @@ function DashboardSkeleton() {
   return (
     <div className="flex min-h-screen animate-in fade-in duration-300">
       {/* Sidebar skeleton */}
-      <div className="w-64 border-e bg-white h-screen flex flex-col">
+      <div className="hidden md:flex w-64 border-e bg-white h-screen flex-col">
         <div className="p-4 border-b">
           <Skeleton className="h-7 w-32" />
         </div>
@@ -88,7 +88,7 @@ export default function DashboardLayout({
         <Sidebar />
         <div className="flex-1 flex flex-col">
           <Topbar />
-          <main className="flex-1 p-6 bg-gray-50">{children}</main>
+          <main className="flex-1 p-3 md:p-6 bg-gray-50 overflow-x-hidden min-w-0">{children}</main>
         </div>
       </div>
     </RtlProvider>
