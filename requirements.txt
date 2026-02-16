@@ -14,5 +14,6 @@ sentence-transformers
 numpy
 pandas
 gunicorn
+whitenoise
 djangorestframework-simplejwt>=5.3
 django-cors-headers>=4.3
