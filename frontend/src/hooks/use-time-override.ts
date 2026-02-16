@@ -22,7 +22,6 @@ export function useTimeOverride() {
     queryFn: fetchTime,
     refetchInterval: 30000,
     retry: false,
-    enabled: process.env.NODE_ENV === "development",
   });
 
   const setTime = useMutation({

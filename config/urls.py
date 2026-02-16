@@ -21,7 +21,7 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
 ]
 
-if settings.DEBUG:
-    urlpatterns += [
-        path('api/debug/', include('core.debug_urls')),
-    ]
+# Debug/time-travel endpoints — available in all environments for demo purposes
+urlpatterns += [
+    path('api/debug/', include('core.debug_urls')),
+]
