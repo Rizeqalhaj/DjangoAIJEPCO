@@ -7,12 +7,6 @@ celery[redis]
 httpx
 google-genai>=1.0.0
 twilio>=9.0.0
-anthropic>=0.40.0
-groq>=1.0.0
-chromadb
-sentence-transformers
-numpy
-pandas
 gunicorn
 whitenoise
 djangorestframework-simplejwt>=5.3
