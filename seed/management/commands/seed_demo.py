@@ -18,7 +18,7 @@ from meter.generator import generate_meter_data
 DEMO_SUBSCRIBERS = [
     {
         "subscription_number": "01-100001-01",
-        "phone_number": "+962791000001",
+        "phone_number": "+962798494038",
         "name": "\u0623\u062d\u0645\u062f \u0627\u0644\u062e\u0627\u0644\u062f\u064a",
         "username": "ahmed",
         "area": "\u0639\u0628\u062f\u0648\u0646",
