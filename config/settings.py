@@ -166,7 +166,7 @@ CELERY_BEAT_SCHEDULE = {
 # Cache (uses Redis if available, otherwise in-memory)
 try:
     import redis as _redis
-    _r = _redis.from_url(REDIS_URL)
+    _r = _redis.from_url(REDIS_URL, socket_connect_timeout=2)
     _r.ping()
     CACHES = {
         'default': {
