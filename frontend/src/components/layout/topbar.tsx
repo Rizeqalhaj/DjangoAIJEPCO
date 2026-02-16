@@ -40,13 +40,13 @@ function TouIndicator() {
   const timeLeft = formatMinutesLeft(tou.minutes_remaining, locale);
 
   return (
-    <div className="flex items-center gap-2 rounded-full bg-muted px-3 py-1.5">
+    <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-muted px-2 sm:px-3 py-1 sm:py-1.5">
       <span
-        className="inline-block h-2.5 w-2.5 rounded-full animate-pulse"
+        className="inline-block h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full animate-pulse"
         style={{ backgroundColor: color }}
       />
-      <span className="text-sm font-medium">{label}</span>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs sm:text-sm font-medium">{label}</span>
+      <span className="hidden sm:inline text-xs text-muted-foreground">
         {"\u2014"} {timeLeft} {t.common.days === "days" ? "left" : "\u0645\u062A\u0628\u0642\u064A"}
       </span>
     </div>
@@ -132,9 +132,7 @@ export function Topbar() {
     <header className="h-14 bg-white flex items-center justify-between px-3 md:px-4 shadow-sm">
       <div className="flex items-center gap-2 md:gap-3">
         <MobileSidebar />
-        <div className="hidden sm:flex">
-          <TouIndicator />
-        </div>
+        <TouIndicator />
         <div className="hidden md:flex">
           <TimeTravelWidget />
         </div>

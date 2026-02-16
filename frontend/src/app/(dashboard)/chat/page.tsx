@@ -116,7 +116,7 @@ export default function ChatPage() {
           <div ref={endRef} />
         </CardContent>
         <div className="border-t p-3 flex gap-2 shrink-0">
-          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={t.chat.placeholder} disabled={chat.isPending} className="text-sm" />
+          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={t.chat.placeholder} disabled={chat.isPending} className="text-base md:text-sm" />
           <Button onClick={() => send()} disabled={chat.isPending || !input.trim()}>{t.common.send}</Button>
         </div>
       </Card>
