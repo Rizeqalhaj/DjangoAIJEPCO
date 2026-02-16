@@ -31,9 +31,12 @@ def time_override_view(request):
 
     if request.method == "DELETE":
         clear_override()
+        # Run plan verification at real time (plans may have matured)
+        verified = check_plan_verifications()
         return Response({
             "current_time": timezone.now().isoformat(),
             "is_overridden": False,
+            "plans_verified": verified,
         })
 
     # POST
