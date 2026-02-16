@@ -126,9 +126,7 @@ if _extra_cors:
         if origin:
             CORS_ALLOWED_ORIGINS.append(origin)
 
-if not DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL', default=False)
-
+CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL', default=False)
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF
