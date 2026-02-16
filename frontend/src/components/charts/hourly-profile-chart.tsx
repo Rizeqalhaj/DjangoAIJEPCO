@@ -70,14 +70,14 @@ export function HourlyProfileChart({ data }: { data: HourlyProfile }) {
         <XAxis
           dataKey="hour"
           fontSize={11}
-          tick={{ fill: "#9ca3af" }}
+          tick={{ fill: "#4b5563" }}
           axisLine={{ stroke: "#d1d5db" }}
           tickLine={false}
           tickFormatter={(v) => `${Number(v)}:00`}
         />
         <YAxis
           fontSize={12}
-          tick={{ fill: "#9ca3af" }}
+          tick={{ fill: "#4b5563" }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `${Number(v)} kW`}
