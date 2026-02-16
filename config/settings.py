@@ -9,7 +9,9 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, True),
     DJANGO_ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '.ngrok-free.dev', 'ayaan-ascertainable-tidally.ngrok-free.dev']),
 )
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'), overwrite=True)
+_env_file = os.path.join(BASE_DIR, '.env')
+if os.path.isfile(_env_file):
+    environ.Env.read_env(_env_file, overwrite=True)
 
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 DEBUG = env('DJANGO_DEBUG')
