@@ -8,35 +8,55 @@ test plan verifications, spike detection, etc.
 This module also monkey-patches django.utils.timezone.now so that
 Django internals (auto_now_add, auto_now, etc.) also respect the
 override. This ensures created_at fields use the simulated date.
+
+The override is stored on disk (a temp file) so it is shared across
+all gunicorn workers without requiring Redis.
 """
 
-import django.utils.timezone as _tz
-from django.core.cache import cache
+import os
+import tempfile
+from datetime import datetime, timezone as dt_tz
 
-CACHE_KEY = "time_override"
+import django.utils.timezone as _tz
+
+_OVERRIDE_FILE = os.path.join(tempfile.gettempdir(), "kahrabaai_time_override")
 
 _original_now = _tz.now
 
 
 def now():
     """Return the current datetime, or the override if set."""
-    override = cache.get(CACHE_KEY)
+    override = get_override()
     return override if override else _original_now()
 
 
 def set_override(dt):
     """Set a datetime override. All calls to now() will return this value."""
-    cache.set(CACHE_KEY, dt, timeout=None)
+    with open(_OVERRIDE_FILE, "w") as f:
+        f.write(dt.isoformat())
 
 
 def clear_override():
     """Clear the datetime override. now() returns real time again."""
-    cache.delete(CACHE_KEY)
+    try:
+        os.remove(_OVERRIDE_FILE)
+    except FileNotFoundError:
+        pass
 
 
 def get_override():
     """Return the current override datetime, or None if not set."""
-    return cache.get(CACHE_KEY)
+    try:
+        with open(_OVERRIDE_FILE, "r") as f:
+            iso = f.read().strip()
+        if not iso:
+            return None
+        dt = datetime.fromisoformat(iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=dt_tz.utc)
+        return dt
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 # Monkey-patch django.utils.timezone.now so Django internals
