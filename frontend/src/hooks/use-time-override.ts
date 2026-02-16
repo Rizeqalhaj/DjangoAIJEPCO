@@ -20,8 +20,9 @@ export function useTimeOverride() {
   const query = useQuery<TimeState>({
     queryKey: ["debug-time"],
     queryFn: fetchTime,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
     retry: false,
+    enabled: process.env.NODE_ENV === "development",
   });
 
   const setTime = useMutation({
