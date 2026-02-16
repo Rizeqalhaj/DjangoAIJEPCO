@@ -40,17 +40,25 @@ export default function ChatPage() {
     }
   }, [chat.isPending]);
 
-  const send = () => {
-    const text = input.trim();
-    if (!text || !phone) return;
-    setMsgs((p) => [...p, { role: "user", content: text }]);
+  const send = (text?: string) => {
+    const msg = (text ?? input).trim();
+    if (!msg || !phone) return;
+    setMsgs((p) => [...p, { role: "user", content: msg }]);
     setInput("");
-    chat.mutate({ phone, message: text }, {
+    chat.mutate({ phone, message: msg }, {
       onSuccess: (d) => setMsgs((p) => [...p, { role: "assistant", content: d.reply }]),
       onError: () => setMsgs((p) => [...p, { role: "assistant", content: "Error: could not get response" }]),
       onSettled: () => inputRef.current?.focus(),
     });
   };
+
+  const quickActions = [
+    t.chat.quickMyConsumption,
+    t.chat.quickBillHigh,
+    t.chat.quickMyPlan,
+    t.chat.quickSaveTips,
+    t.chat.quickCompare,
+  ];
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
@@ -61,13 +69,24 @@ export default function ChatPage() {
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
           {msgs.length === 0 && !chat.isPending && (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
               <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
                 <svg className="h-7 w-7 text-primary" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
               <p className="text-sm text-muted-foreground max-w-sm">{t.chat.welcomeMsg}</p>
+              <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                {quickActions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => send(q)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-full border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {msgs.map((m, i) => (
@@ -98,7 +117,7 @@ export default function ChatPage() {
         </CardContent>
         <div className="border-t p-3 flex gap-2 shrink-0">
           <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder={t.chat.placeholder} disabled={chat.isPending} className="text-sm" />
-          <Button onClick={send} disabled={chat.isPending || !input.trim()}>{t.common.send}</Button>
+          <Button onClick={() => send()} disabled={chat.isPending || !input.trim()}>{t.common.send}</Button>
         </div>
       </Card>
     </div>

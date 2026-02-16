@@ -62,6 +62,11 @@ export const en = {
     thinking: "Thinking...",
     welcomeMsg: "Hello! I am your energy detective. Ask me about your electricity consumption, spikes, or savings tips.",
     botName: "KahrabaAI",
+    quickMyConsumption: "How is my consumption?",
+    quickBillHigh: "Why is my bill high?",
+    quickMyPlan: "How is my plan going?",
+    quickSaveTips: "Tips to save money",
+    quickCompare: "Compare this week vs last",
   },
   spikes: {
     title: "Consumption Spikes",

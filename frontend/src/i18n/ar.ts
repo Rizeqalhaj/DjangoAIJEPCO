@@ -64,6 +64,11 @@ export const ar: Translations = {
     thinking: "جاري التفكير...",
     welcomeMsg: "مرحباً! أنا محقق الطاقة الخاص بك. اسألني عن استهلاكك للكهرباء أو الارتفاعات أو نصائح التوفير.",
     botName: "كهربا-ذكاء",
+    quickMyConsumption: "كيف استهلاكي؟",
+    quickBillHigh: "ليش فاتورتي عالية؟",
+    quickMyPlan: "كيف خطتي ماشية؟",
+    quickSaveTips: "نصائح للتوفير",
+    quickCompare: "قارن هالأسبوع بالماضي",
   },
   spikes: {
     title: "ارتفاعات الاستهلاك",
