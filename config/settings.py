@@ -118,16 +118,20 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://django-aijepco.vercel.app',
 ]
 _extra_cors = env('CORS_ALLOWED_ORIGIN', default='')
 if _extra_cors:
     for origin in _extra_cors.split(','):
         origin = origin.strip().rstrip('/')
-        if origin:
+        if origin and origin not in CORS_ALLOWED_ORIGINS:
             CORS_ALLOWED_ORIGINS.append(origin)
 
-CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL', default=False)
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept', 'authorization', 'content-type', 'origin',
+    'user-agent', 'x-csrftoken', 'x-requested-with',
+]
 
 # CSRF
 CSRF_TRUSTED_ORIGINS = [o for o in CORS_ALLOWED_ORIGINS if o.startswith('https')]
