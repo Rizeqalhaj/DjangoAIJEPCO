@@ -154,9 +154,12 @@ class EnergyDetective:
         # Inject current date/time so LLM can compute relative dates
         current_dt = clock_now()
         system += (
-            f"\n\n## Current Date & Time\n"
-            f"Today is {current_dt.strftime('%A, %Y-%m-%d')} "
+            f"\n\n## Current Date & Time (AUTHORITATIVE — DO NOT OVERRIDE)\n"
+            f"The current date and time is: **{current_dt.strftime('%A, %Y-%m-%d')}** "
             f"(time: {current_dt.strftime('%H:%M')}).\n"
+            f"This date is set by the server and MUST be treated as the true current date. "
+            f"Do NOT use any other source for the current date. If the user asks what today's "
+            f"date is, answer with this date: {current_dt.strftime('%Y-%m-%d')}.\n"
             f"Use this to compute relative dates like 'yesterday', 'this week', 'last week', etc.\n"
             f"For 'this week', use Monday–Sunday of the current week.\n"
             f"For 'last week', use Monday–Sunday of the previous week."
