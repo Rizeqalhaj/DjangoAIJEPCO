@@ -352,6 +352,21 @@ python manage.py test tests.test_phase3.ToolExecutionTest
 **Fix:** Added explicit rule to the Conversation Awareness section of the system prompt: "You HAVE access to the user's conversation history — it is in the message history above. NEVER claim you cannot see previous messages."
 **Files:** `agent/prompts.py` (## Conversation Awareness section)
 
+### 16. `.env` changes not picked up by Django dev server auto-reload
+**Problem:** After updating Twilio credentials in `.env`, the Django dev server auto-reloader restarts the child process but the child inherits the parent's `os.environ` with the old values. `django-environ`'s `read_env()` defaults to `overwrite=False`, so it skips already-set env vars.
+**Fix:** Changed `environ.Env.read_env(...)` to `environ.Env.read_env(..., overwrite=True)` in `config/settings.py`. A full server restart (kill parent + child) is still needed for the first time after this fix.
+**Files:** `config/settings.py` (`read_env` call with `overwrite=True`)
+
+### 17. Twilio replies silently fail when Celery worker has stale credentials
+**Problem:** With Redis running, `_celery_worker_available()` returns `True` and messages are dispatched to the Celery queue. The Celery worker (a separate process) processes messages and calls `send_text`, but if it was started before `.env` was updated, it uses old Twilio credentials. `send_text` catches `TwilioRestException` and returns `None` — the failure is silent, the user gets no reply.
+**Fix:** After updating Twilio credentials, you must restart both the Django server AND any running Celery workers. Kill workers with `kill <pid>` then restart: `celery -A config worker -l info --concurrency=2`. Also clear stale Celery cache: `redis-cli del ":1:celery_worker_available"`.
+**Files:** `whatsapp/sender.py` (silent failure on send), `whatsapp/tasks.py` (`_celery_worker_available` dispatches to Celery when Redis is up)
+
+### 18. Twilio signature validation fails after switching Twilio accounts
+**Problem:** Twilio signs webhooks using the account's auth token. If you switch to a different Twilio account (different `TWILIO_ACCOUNT_SID`), the signature is computed with the new account's token but the server still validates with the old token → 401.
+**Diagnosis:** Compare `AccountSid` in the POST body with `TWILIO_ACCOUNT_SID` in `.env`. If they differ, credentials are stale. Use ngrok inspector (`http://127.0.0.1:4040`) to inspect request/response details.
+**Fix:** Update `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` in `.env` to match the new account, then restart Django + Celery (see issues #16 and #17).
+
 ---
 
 ## Remaining Work
