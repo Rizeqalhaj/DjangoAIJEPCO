@@ -63,3 +63,13 @@ RATE_LIMIT_EN = (
     "Sorry, you've sent too many messages in a short time. "
     "Please try again shortly. 🕐"
 )
+
+VOICE_TRANSCRIPTION_FAILED_AR = (
+    "عذراً، ما قدرت أفهم الرسالة الصوتية. 🎤\n"
+    "حاول مرة ثانية أو اكتب سؤالك نص."
+)
+
+VOICE_TRANSCRIPTION_FAILED_EN = (
+    "Sorry, I couldn't understand your voice message. 🎤\n"
+    "Please try again or type your question."
+)

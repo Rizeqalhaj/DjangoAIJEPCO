@@ -9,6 +9,13 @@ from rest_framework.response import Response
 from twilio.request_validator import RequestValidator
 
 from whatsapp.tasks import dispatch_message
+from whatsapp.transcriber import transcribe_audio
+from whatsapp.sender import send_text
+from whatsapp.language_detect import detect_language
+from whatsapp.message_templates import (
+    VOICE_TRANSCRIPTION_FAILED_AR,
+    VOICE_TRANSCRIPTION_FAILED_EN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,7 @@ def whatsapp_webhook(request):
 
     Receives form-encoded POST with fields:
         From, Body, MessageSid, NumMedia, ProfileName, ButtonText, etc.
+    For voice messages: NumMedia=1, MediaUrl0, MediaContentType0.
     """
     if not verify_twilio_signature(request):
         logger.warning("Invalid Twilio webhook signature")
@@ -30,12 +38,27 @@ def whatsapp_webhook(request):
     body = request.data.get("Body", "")
     message_sid = request.data.get("MessageSid", "")
     button_text = request.data.get("ButtonText", "")
+    num_media = int(request.data.get("NumMedia", "0"))
 
     # Strip 'whatsapp:' prefix from phone
     phone = _strip_whatsapp_prefix(phone)
 
     # Prefer button text over body (interactive reply)
     text = button_text or body
+
+    # Handle voice messages (audio media)
+    if num_media > 0:
+        media_type = request.data.get("MediaContentType0", "")
+        media_url = request.data.get("MediaUrl0", "")
+        if media_type.startswith("audio/") and media_url:
+            logger.info("Voice message from %s (%s)", phone, media_type)
+            transcribed = transcribe_audio(media_url, media_type)
+            if transcribed:
+                text = transcribed
+            else:
+                lang = detect_language(body) if body else "ar"
+                send_text(phone, VOICE_TRANSCRIPTION_FAILED_AR if lang == "ar" else VOICE_TRANSCRIPTION_FAILED_EN)
+                return Response({"status": "transcription_failed"}, status=200)
 
     if not phone or not text:
         return Response({"status": "ignored"}, status=200)

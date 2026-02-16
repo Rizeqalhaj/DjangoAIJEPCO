@@ -69,6 +69,9 @@ Arabic plan-creation regex uses specific phrases (خطة التوفير, خطة 
 
 When high-severity violations are detected, `coach.py` automatically injects a correction prompt, re-calls the LLM, runs any triggered tool calls, and strips the correction exchange from the conversation cache so it's invisible to future turns.
 
+### Voice Message Transcription
+`whatsapp/transcriber.py` handles WhatsApp voice messages. When Twilio sends a webhook with `NumMedia > 0` and an `audio/*` content type, the webhook downloads the audio from Twilio's media URL (using httpx + basic auth), uploads it to Gemini via the `google.genai` SDK (NOT the deprecated `google.generativeai`), and transcribes it using `gemini-2.0-flash`. The transcribed text is then fed into the existing agent pipeline as if the user typed it. If transcription fails, a friendly error message is sent back. Supported formats: OGG, MP3, M4A, WAV, WebM (WhatsApp sends OGG/Opus by default).
+
 ### Custom Date Range Support
 `meter/analyzer.py` `get_consumption_summary()` accepts optional `start_date`/`end_date` for exact calendar month queries (e.g. "January 2026" → `2026-01-01` to `2026-01-31`). The `days` parameter is for rolling windows only. Backend API views and frontend hooks also support `?start_date=&end_date=` query params. The dashboard has a "Custom" date range picker alongside preset day buttons.
 

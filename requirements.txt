@@ -5,6 +5,7 @@ psycopg2-binary
 redis
 celery[redis]
 httpx
+google-genai>=1.0.0
 twilio>=9.0.0
 anthropic>=0.40.0
 groq>=1.0.0
