@@ -6,6 +6,7 @@ redis
 celery[redis]
 httpx
 google-genai>=1.0.0
+openai
 twilio>=9.0.0
 gunicorn
 whitenoise
