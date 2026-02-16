@@ -9,4 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD sh -c "echo PORT=$PORT && python manage.py migrate --noinput && python manage.py collectstatic --noinput && echo 'Starting gunicorn...' && gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --log-level debug --timeout 120"
+RUN chmod +x start.sh
+
+CMD ["bash", "start.sh"]
