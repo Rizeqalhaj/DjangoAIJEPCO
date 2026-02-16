@@ -142,18 +142,12 @@ def check_plan_verifications():
     verified = 0
     for plan in plans:
         try:
-            if not plan.subscriber.is_verified:
-                continue
-
-            if not plan.subscriber.wants_plan_checkups:
-                continue
-
             _verify_and_notify(plan)
             verified += 1
         except Exception:
             logger.exception("Plan verification failed for plan %d", plan.id)
 
-    logger.info("Plans verified: %d/%d eligible", verified, plans.count())
+    logger.info("Plans verified: %d/%d eligible (today=%s)", verified, plans.count(), today)
     return verified
 
 
