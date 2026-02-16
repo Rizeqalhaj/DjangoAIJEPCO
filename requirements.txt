@@ -8,6 +8,7 @@ httpx
 google-genai>=1.0.0
 openai
 twilio>=9.0.0
+numpy
 gunicorn
 whitenoise
 djangorestframework-simplejwt>=5.3
