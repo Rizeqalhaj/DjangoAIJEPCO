@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 COPY requirements.txt .
@@ -7,6 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN python manage.py collectstatic --noinput 2>/dev/null || true
-
-CMD python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:$PORT --log-level info --access-logfile - --error-logfile -
+CMD sh -c "echo PORT=$PORT && python manage.py migrate --noinput && python manage.py collectstatic --noinput && echo 'Starting gunicorn...' && gunicorn config.wsgi --bind 0.0.0.0:${PORT:-8000} --log-level debug --timeout 120"
